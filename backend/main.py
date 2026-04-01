@@ -1,5 +1,6 @@
 import asyncio
 import io
+import time
 from datetime import date
 from typing import Optional
 
@@ -56,17 +57,21 @@ TEAM_NAME_TO_ABBR: dict[str, str] = {
     "Washington Nationals": "WSH",
 }
 
+PARQUET_CACHE_TTL = 30 * 60  # 30 minutes
+
 _master_df: Optional[pd.DataFrame] = None
+_master_df_loaded_at: float = 0.0
 
 
 async def fetch_master_df() -> pd.DataFrame:
-    global _master_df
-    if _master_df is not None:
+    global _master_df, _master_df_loaded_at
+    if _master_df is not None and (time.monotonic() - _master_df_loaded_at) < PARQUET_CACHE_TTL:
         return _master_df
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.get(PARQUET_URL)
         response.raise_for_status()
     _master_df = pd.read_parquet(io.BytesIO(response.content))
+    _master_df_loaded_at = time.monotonic()
     return _master_df
 
 
@@ -143,7 +148,12 @@ def compute_tags(
     tags: list[str] = []
 
     if ml_home is not None and ml_away is not None:
-        tags.append("Home Favorite" if ml_home < ml_away else "Away Favorite")
+        if ml_home < ml_away:
+            tags.append("Home Favorite")
+            tags.append("Away Underdog")
+        else:
+            tags.append("Away Favorite")
+            tags.append("Home Underdog")
 
     for label, stats in [("Home", home_stats), ("Away", away_stats)]:
         streak = stats.get("streak", "")
@@ -208,7 +218,7 @@ async def get_games_for_date(game_date: str):
             "game_id": str(row["game_id"]),
             "game_date": str(row["game_date"]),
             "start_time_et": format_time_et(row.get("start_time_et")),
-            "status": str(row.get("status", "Scheduled")),
+            "status": "Scheduled" if pd.isna(row.get("status")) else str(row.get("status")),
             "home_team": {"abbr": home_abbr, "name": home_name, **home_stats},
             "away_team": {"abbr": away_abbr, "name": away_name, **away_stats},
             "odds": {
@@ -259,4 +269,10 @@ async def debug_abbrs(game_date: str):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    age = time.monotonic() - _master_df_loaded_at if _master_df is not None else None
+    return {
+        "status": "ok",
+        "parquet_cached": _master_df is not None,
+        "parquet_age_seconds": round(age) if age is not None else None,
+        "parquet_ttl_seconds": PARQUET_CACHE_TTL,
+    }

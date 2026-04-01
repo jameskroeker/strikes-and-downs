@@ -33,8 +33,8 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Strikes &amp; Downs</h1>
-        <p className="subtitle">MLB Betting Analytics</p>
+        <h1><span className="logo-icon">⚾</span> Strikes &amp; Downs</h1>
+        <p className="subtitle">MLB Betting Analytics | 2026 Season</p>
       </header>
 
       <div className="date-nav">

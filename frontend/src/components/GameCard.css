@@ -14,6 +14,9 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
+.card-scheduled { border-left: 3px solid #3b82f6; }
+.card-final     { border-left: 3px solid #22c55e; }
+
 /* Header */
 .game-header {
   display: flex;
@@ -168,4 +171,16 @@
   font-weight: 600;
   border: 1px solid #2d3a52;
   letter-spacing: 0.2px;
+}
+
+.tag-favorite { background: #3b82f6; color: #ffffff; border-color: #2563eb; }
+.tag-underdog { background: #f97316; color: #ffffff; border-color: #ea580c; }
+.tag-hot      { background: #22c55e; color: #14532d; border-color: #16a34a; }
+.tag-cold     { background: #ef4444; color: #ffffff; border-color: #dc2626; }
+
+/* Mobile: larger team abbreviations */
+@media (max-width: 480px) {
+  .team-abbr {
+    font-size: 2rem;
+  }
 }

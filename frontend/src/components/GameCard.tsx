@@ -5,6 +5,25 @@ interface Props {
   game: Game
 }
 
+const INVALID_VALUES = new Set(['nan', 'tbd', 'none', 'nat', ''])
+
+function cleanTime(val: string): string {
+  return INVALID_VALUES.has(val.toLowerCase()) ? '' : val
+}
+
+function cleanStatus(val: string): string {
+  return INVALID_VALUES.has(val.toLowerCase()) ? 'Scheduled' : val
+}
+
+function tagClass(tag: string): string {
+  const t = tag.toLowerCase()
+  if (t.includes('favorite')) return 'tag tag-favorite'
+  if (t.includes('hot'))      return 'tag tag-hot'
+  if (t.includes('cold'))     return 'tag tag-cold'
+  if (t.includes('underdog')) return 'tag tag-underdog'
+  return 'tag'
+}
+
 function formatMoneyline(odds: number | null): string {
   if (odds === null) return '–'
   return odds > 0 ? `+${odds}` : `${odds}`
@@ -20,13 +39,17 @@ const STATUS_CLASS: Record<string, string> = {
 export function GameCard({ game }: Props) {
   const { home_team, away_team, odds, tags, status, start_time_et, home_score, away_score } = game
   const hasScore = home_score !== null && away_score !== null
-  const statusClass = STATUS_CLASS[status.toLowerCase()] ?? 'status-scheduled'
+  const displayStatus = cleanStatus(status)
+  const statusClass = STATUS_CLASS[displayStatus.toLowerCase()] ?? 'status-scheduled'
+  const gameTime = cleanTime(start_time_et)
+
+  const cardStatusClass = displayStatus.toLowerCase() === 'final' ? 'card-final' : 'card-scheduled'
 
   return (
-    <div className="game-card">
+    <div className={`game-card ${cardStatusClass}`}>
       <div className="game-header">
-        <span className="game-time">{start_time_et}</span>
-        <span className={`game-status ${statusClass}`}>{status}</span>
+        {gameTime && <span className="game-time">{gameTime}</span>}
+        <span className={`game-status ${statusClass}`}>{displayStatus}</span>
       </div>
 
       <div className="matchup">
@@ -88,7 +111,7 @@ export function GameCard({ game }: Props) {
       {tags.length > 0 && (
         <div className="tags">
           {tags.map((tag) => (
-            <span key={tag} className="tag">
+            <span key={tag} className={tagClass(tag)}>
               {tag}
             </span>
           ))}
