@@ -1,0 +1,74 @@
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #f0f4ff;
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  color: #4a5568;
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.date-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.date-nav input[type='date'] {
+  background: #1a1f2e;
+  border: 1px solid #2a3040;
+  border-radius: 6px;
+  color: #c9d1e0;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.date-nav button {
+  background: #1a1f2e;
+  border: 1px solid #2a3040;
+  border-radius: 6px;
+  color: #8899bb;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.date-nav button:hover {
+  background: #232838;
+  color: #c9d1e0;
+}
+
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+.loading,
+.error,
+.no-games {
+  text-align: center;
+  padding: 4rem;
+  color: #4a5568;
+  font-size: 0.95rem;
+}
+
+.error { color: #f87171; }
