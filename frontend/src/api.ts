@@ -1,6 +1,15 @@
-import type { GamesResponse } from './types'
+```
 
+Use the arrow keys to get to this line:
+```
 const API_BASE = '/api'
+```
+
+Delete it and replace with:
+```
+const API_BASE = `${import.meta.env.VITE_API_URL}/api`import type { GamesResponse } from './types'
+
+const API_BASE = `${import.meta.env.VITE_API_URL}/api`
 
 export async function fetchTodayGames(): Promise<GamesResponse> {
   const res = await fetch(`${API_BASE}/games/today`)
