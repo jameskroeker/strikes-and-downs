@@ -13,7 +13,7 @@ app = FastAPI(title="Strikes and Downs API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "https://strikes-and-downs.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
