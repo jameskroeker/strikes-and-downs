@@ -2,12 +2,9 @@
 
 Use the arrow keys to get to this line:
 ```
-const API_BASE = '/api'
-```
+const API_BASE = 
 
-Delete it and replace with:
-```
-const API_BASE = `${import.meta.env.VITE_API_URL}/api`import type { GamesResponse } from './types'
+import type { GamesResponse } from './types'
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`
 
