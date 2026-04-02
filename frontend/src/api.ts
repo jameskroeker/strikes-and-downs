@@ -1,9 +1,3 @@
-```
-
-Use the arrow keys to get to this line:
-```
-const API_BASE = 
-
 import type { GamesResponse } from './types'
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`
