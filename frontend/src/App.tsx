@@ -1,19 +1,28 @@
 import { useEffect, useState } from 'react'
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import { fetchGamesForDate } from './api'
 import type { Game } from './types'
 import { GameCard } from './components/GameCard'
+import { GameDetail } from './components/GameDetail'
 import './App.css'
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function App() {
+function offsetDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+function GamesList() {
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [games, setGames] = useState<Game[]>([])
   const [displayDate, setDisplayDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     setLoading(true)
@@ -56,7 +65,13 @@ function App() {
           ) : (
             <main className="games-grid">
               {games.map((game) => (
-                <GameCard key={game.game_id} game={game} />
+                <div
+                  key={game.game_id}
+                  onClick={() => navigate(`/game/${game.game_id}?date=${selectedDate}`)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <GameCard game={game} />
+                </div>
               ))}
             </main>
           )}
@@ -66,10 +81,15 @@ function App() {
   )
 }
 
-function offsetDate(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T12:00:00')
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<GamesList />} />
+        <Route path="/game/:gameId" element={<GameDetail />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
 
 export default App
