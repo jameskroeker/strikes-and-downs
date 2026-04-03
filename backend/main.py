@@ -397,6 +397,12 @@ def query_situation(hist_df: pd.DataFrame, filters: dict, min_n: int = 15) -> Op
 
     wins = int(df["team_won"].sum())
     win_pct = round(wins / n, 3)
+    dev = round(deviation_score(wins, n), 3)
+
+    # Only surface meaningful deviations
+    min_deviation = 0.08
+    if dev < min_deviation:
+        return None
 
     return {
         "label": build_situation_label(filters),
@@ -404,7 +410,57 @@ def query_situation(hist_df: pd.DataFrame, filters: dict, min_n: int = 15) -> Op
         "losses": n - wins,
         "n": n,
         "win_pct": win_pct,
-        "deviation": round(deviation_score(wins, n), 3),
+        "deviation": dev,
+    }
+
+
+def query_league_situation(
+    hist_df: pd.DataFrame,
+    filters: dict,
+    exclude_abbr: str,
+) -> Optional[dict]:
+    """League-wide situation query excluding the specific team."""
+    df = hist_df[hist_df["team_abbr"] != exclude_abbr].copy()
+    df["_team_bucket"] = df["Win_Pct"].apply(win_pct_bucket)
+    df["_odds_bucket"] = df["h2h_own_odds"].apply(
+        lambda x: odds_bucket(x) if pd.notna(x) else None
+    )
+    opp_win_pcts = hist_df.groupby(["game_id", "team_abbr"])["Win_Pct"].first()
+    def get_opp_bucket(row):
+        try:
+            return win_pct_bucket(float(opp_win_pcts.loc[(row["game_id"], row["opponent_abbr"])]))
+        except (KeyError, TypeError):
+            return None
+    df["_opp_bucket"] = df.apply(get_opp_bucket, axis=1)
+
+    if "is_home" in filters:
+        df = df[df["is_home"] == filters["is_home"]]
+    if "odds_bucket" in filters:
+        df = df[df["_odds_bucket"] == filters["odds_bucket"]]
+    if "team_bucket" in filters:
+        df = df[df["_team_bucket"] == filters["team_bucket"]]
+    if "opp_bucket" in filters:
+        df = df[df["_opp_bucket"] == filters["opp_bucket"]]
+
+    df = df[df["team_won"].notna()]
+    n = len(df)
+    if n < 30:
+        return None
+
+    wins = int(df["team_won"].sum())
+    win_pct = round(wins / n, 3)
+    dev = round(deviation_score(wins, n), 3)
+
+    if dev < 0.05:
+        return None
+
+    return {
+        "label": build_situation_label(filters),
+        "wins": wins,
+        "losses": n - wins,
+        "n": n,
+        "win_pct": win_pct,
+        "deviation": dev,
     }
 
 
@@ -525,17 +581,40 @@ async def get_game_situations(game_id: str, game_date: str):
             for f in situation_filters
         ]
 
-        situations = []
+        # Team-specific situations
+        team_situations = []
         seen_labels = set()
         for filters in situation_filters:
             result = query_situation(team_hist, filters)
             if result and result["label"] not in seen_labels:
                 seen_labels.add(result["label"])
-                situations.append(result)
+                team_situations.append(result)
+        team_situations.sort(key=lambda x: x["deviation"], reverse=True)
 
-        # Sort by deviation from 50%, take top 5
-        situations.sort(key=lambda x: x["deviation"], reverse=True)
-        results[abbr] = situations[:5]
+        # League context situations — fixed filter set, exclude this team
+        league_filters = [
+            {"is_home": is_home, "odds_bucket": own_odds_bucket},
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "opp_bucket": opp_bucket},
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket},
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket},
+        ]
+        league_filters = [
+            {k: v for k, v in f.items() if v is not None}
+            for f in league_filters
+        ]
+        league_situations = []
+        seen_league_labels = set()
+        for filters in league_filters:
+            result = query_league_situation(hist_df, filters, exclude_abbr=abbr)
+            if result and result["label"] not in seen_league_labels:
+                seen_league_labels.add(result["label"])
+                league_situations.append(result)
+        league_situations.sort(key=lambda x: x["deviation"], reverse=True)
+
+        results[abbr] = {
+            "team_situations": team_situations[:5],
+            "league_situations": league_situations[:4],
+        }
 
     return {
         "game_id": game_id,
