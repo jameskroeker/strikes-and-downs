@@ -276,3 +276,271 @@ async def health():
         "parquet_age_seconds": round(age) if age is not None else None,
         "parquet_ttl_seconds": PARQUET_CACHE_TTL,
     }
+
+
+# ── Situations Engine ──────────────────────────────────────────────
+
+def win_pct_bucket(win_pct: float) -> str:
+    if win_pct >= 0.59: return "elite"
+    if win_pct >= 0.53: return "good"
+    if win_pct >= 0.47: return "average"
+    if win_pct >= 0.41: return "poor"
+    return "bad"
+
+def total_bucket(total: float) -> str:
+    if total < 7.0:   return "low"
+    if total <= 7.5:  return "low-mid"
+    if total <= 8.5:  return "mid-high"
+    return "high"
+
+def odds_bucket(decimal_odds: float) -> str:
+    """Bucket a team's own moneyline odds based on actual data distribution."""
+    if decimal_odds < 1.50:  return "heavy_favorite"   # -400 to -200
+    if decimal_odds < 1.75:  return "favorite"          # -200 to -133
+    if decimal_odds < 1.95:  return "slight_favorite"   # -133 to -105
+    if decimal_odds < 2.10:  return "pick"              # -105 to +110
+    if decimal_odds < 2.50:  return "slight_underdog"   # +110 to +150
+    if decimal_odds < 3.25:  return "underdog"          # +150 to +225
+    return "big_underdog"                               # +225 and up
+
+ODDS_BUCKET_LABELS = {
+    "heavy_favorite":  "Heavy Favorite (-400 to -200)",
+    "favorite":        "Favorite (-200 to -133)",
+    "slight_favorite": "Slight Favorite (-133 to -105)",
+    "pick":            "Pick (-105 to +110)",
+    "slight_underdog": "Slight Underdog (+110 to +150)",
+    "underdog":        "Underdog (+150 to +225)",
+    "big_underdog":    "Big Underdog (+225+)",
+}
+
+WIN_PCT_BUCKET_LABELS = {
+    "elite":   "Elite (59%+)",
+    "good":    "Good (53-58%)",
+    "average": "Average (47-52%)",
+    "poor":    "Poor (41-46%)",
+    "bad":     "Bad (<40%)",
+}
+
+TOTAL_BUCKET_LABELS = {
+    "low":      "Total <7.0",
+    "low-mid":  "Total 7.0-7.5",
+    "mid-high": "Total 7.5-8.5",
+    "high":     "Total 8.5+",
+}
+
+L10_BUCKET_LABELS = {
+    "hot":     "L10 Hot (8-10 wins)",
+    "average": "L10 Average (5-7 wins)",
+    "cold":    "L10 Cold (0-4 wins)",
+}
+
+def get_last_10(team_df: pd.DataFrame) -> int:
+    """Return number of wins in last 10 games for a team."""
+    sorted_df = team_df.sort_values("game_date_et")
+    last_10 = sorted_df.tail(10)
+    return int(last_10["team_won"].sum())
+
+def last_10_bucket(wins: int) -> str:
+    if wins >= 8: return "hot"
+    if wins >= 5: return "average"
+    return "cold"
+
+def deviation_score(wins: int, total: int) -> float:
+    """How far win% deviates from 50% — used for ranking."""
+    if total == 0: return 0.0
+    return abs((wins / total) - 0.5)
+
+def build_situation_label(filters: dict) -> str:
+    parts = []
+    role = "Home" if filters.get("is_home") else "Away"
+    if filters.get("odds_bucket"):
+        parts.append(f"{role} — {ODDS_BUCKET_LABELS.get(filters['odds_bucket'], filters['odds_bucket'])}")
+    else:
+        parts.append(role)
+    if filters.get("team_bucket"):
+        parts.append(WIN_PCT_BUCKET_LABELS.get(filters["team_bucket"], filters["team_bucket"]))
+    if filters.get("l10_bucket"):
+        parts.append(L10_BUCKET_LABELS.get(filters["l10_bucket"], filters["l10_bucket"]))
+    if filters.get("total_bucket"):
+        parts.append(TOTAL_BUCKET_LABELS.get(filters["total_bucket"], filters["total_bucket"]))
+    if filters.get("opp_bucket"):
+        parts.append(f"vs {WIN_PCT_BUCKET_LABELS.get(filters['opp_bucket'], filters['opp_bucket'])} opp")
+    return " | ".join(parts)
+
+def query_situation(hist_df: pd.DataFrame, filters: dict, min_n: int = 15) -> Optional[dict]:
+    """Apply filters to historical df and return situation result if n >= min_n."""
+    df = hist_df.copy()
+
+    if "is_home" in filters:
+        df = df[df["is_home"] == filters["is_home"]]
+    if "is_favorite" in filters:
+        if filters["is_favorite"]:
+            df = df[df["h2h_own_odds"] < df["h2h_opp_odds"]]
+        else:
+            df = df[df["h2h_own_odds"] >= df["h2h_opp_odds"]]
+    if "team_bucket" in filters:
+        df = df[df["_team_bucket"] == filters["team_bucket"]]
+    if "opp_bucket" in filters:
+        df = df[df["_opp_bucket"] == filters["opp_bucket"]]
+    if "l10_bucket" in filters:
+        df = df[df["_l10_bucket"] == filters["l10_bucket"]]
+    if "odds_bucket" in filters:
+        df = df[df["_odds_bucket"] == filters["odds_bucket"]]
+    if "total_bucket" in filters:
+        df = df[df["_total_bucket"] == filters["total_bucket"]]
+
+    # Only use completed games with known result
+    df = df[df["team_won"].notna()]
+    n = len(df)
+    if n < min_n:
+        return None
+
+    wins = int(df["team_won"].sum())
+    win_pct = round(wins / n, 3)
+
+    return {
+        "label": build_situation_label(filters),
+        "wins": wins,
+        "losses": n - wins,
+        "n": n,
+        "win_pct": win_pct,
+        "deviation": round(deviation_score(wins, n), 3),
+    }
+
+
+@app.get("/api/games/{game_id}/situations")
+async def get_game_situations(game_id: str, game_date: str):
+    """Return historical situational patterns for both teams in a game."""
+    try:
+        daily_df, master_df = await asyncio.gather(
+            fetch_daily_csv(game_date),
+            fetch_master_df(),
+        )
+    except httpx.HTTPStatusError:
+        raise HTTPException(status_code=404, detail=f"No game data found for {game_date}")
+
+    # Find the game in daily CSV
+    game_row = daily_df[daily_df["game_id"].astype(str) == str(game_id)]
+    if game_row.empty:
+        raise HTTPException(status_code=404, detail=f"Game {game_id} not found for {game_date}")
+    row = game_row.iloc[0]
+
+    home_name = str(row["home_team"])
+    away_name = str(row["away_team"])
+    home_abbr = TEAM_NAME_TO_ABBR.get(home_name, home_name[:3].upper())
+    away_abbr = TEAM_NAME_TO_ABBR.get(away_name, away_name[:3].upper())
+
+    ml_home = safe_float(row.get("moneyline_home"))
+    ml_away = safe_float(row.get("moneyline_away"))
+    total = safe_float(row.get("total_line"))
+
+    season = int(game_date[:4])
+
+    # Use only historical seasons (not current) for pattern matching
+    hist_df = master_df[master_df["season"] < season].copy()
+
+    results = {}
+
+    for abbr, is_home, own_ml, opp_ml in [
+        (home_abbr, True, ml_home, ml_away),
+        (away_abbr, False, ml_away, ml_home),
+    ]:
+        # Get this team's historical rows
+        team_hist = hist_df[hist_df["team_abbr"] == abbr].copy()
+        if team_hist.empty:
+            results[abbr] = []
+            continue
+
+        # Get current season stats for bucketing
+        season_stats = get_team_stats(master_df, abbr, season)
+        team_bucket = win_pct_bucket(season_stats["win_pct"])
+
+        # Calculate last 10 for historical rows per game (rolling)
+        # For situational matching we use season win_pct at time of each game
+        team_hist["_team_bucket"] = team_hist["Win_Pct"].apply(win_pct_bucket)
+        team_hist["_odds_bucket"] = team_hist["h2h_own_odds"].apply(
+            lambda x: odds_bucket(x) if pd.notna(x) else None
+        )
+        team_hist["_total_bucket"] = team_hist["Total"].apply(
+            lambda x: total_bucket(x) if pd.notna(x) else None
+        )
+
+        # Opponent bucket — join opponent win_pct at time of game
+        opp_win_pcts = hist_df.groupby(["game_id", "team_abbr"])["Win_Pct"].first()
+        def get_opp_bucket(game_row):
+            try:
+                gid = game_row["game_id"]
+                opp = game_row["opponent_abbr"]
+                pct = opp_win_pcts.loc[(gid, opp)]
+                return win_pct_bucket(float(pct))
+            except (KeyError, TypeError):
+                return None
+        team_hist["_opp_bucket"] = team_hist.apply(get_opp_bucket, axis=1)
+
+        # Last 10 bucket — rolling wins in last 10 for each game
+        team_hist = team_hist.sort_values("game_date_et")
+        team_hist["_l10_wins"] = team_hist["team_won"].rolling(10, min_periods=5).sum().shift(1)
+        team_hist["_l10_bucket"] = team_hist["_l10_wins"].apply(
+            lambda x: last_10_bucket(int(x)) if pd.notna(x) else None
+        )
+
+        is_fav = (own_ml < opp_ml) if (own_ml and opp_ml) else None
+        t_bucket = total_bucket(total) if total else None
+        own_odds_bucket = odds_bucket(own_ml) if own_ml else None
+
+        # Current team's L10 from current season only (omit if fewer than 10 games played)
+        current_season_df = master_df[
+            (master_df["team_abbr"] == abbr) & (master_df["season"] == season)
+        ].sort_values("game_date_et")
+        current_l10_wins = int(current_season_df.tail(10)["team_won"].sum())
+        current_l10_bucket = last_10_bucket(current_l10_wins) if len(current_season_df) >= 10 else None
+
+        # Current team's opp bucket
+        opp_stats = get_team_stats(master_df, away_abbr if is_home else home_abbr, season)
+        opp_bucket = win_pct_bucket(opp_stats["win_pct"])
+
+        # Define situations to test — from broadest to most specific
+        # Note: total line excluded from win/loss situations — it's a scoring environment
+        # signal not a winner predictor. Reserved for O/U analysis later.
+        situation_filters = [
+            # Broadest baseline
+            {"is_home": is_home},
+            {"is_home": is_home, "odds_bucket": own_odds_bucket},
+            # Team quality
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket},
+            # Opponent quality
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "opp_bucket": opp_bucket},
+            # Team vs opponent
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket},
+            # Team quality alone (no odds bucket — broader sample)
+            {"is_home": is_home, "team_bucket": team_bucket, "opp_bucket": opp_bucket},
+            # L10 form (only once 10+ games played)
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "l10_bucket": current_l10_bucket},
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "l10_bucket": current_l10_bucket},
+        ]
+
+        # Remove any filters with None values
+        situation_filters = [
+            {k: v for k, v in f.items() if v is not None}
+            for f in situation_filters
+        ]
+
+        situations = []
+        seen_labels = set()
+        for filters in situation_filters:
+            result = query_situation(team_hist, filters)
+            if result and result["label"] not in seen_labels:
+                seen_labels.add(result["label"])
+                situations.append(result)
+
+        # Sort by deviation from 50%, take top 5
+        situations.sort(key=lambda x: x["deviation"], reverse=True)
+        results[abbr] = situations[:5]
+
+    return {
+        "game_id": game_id,
+        "game_date": game_date,
+        "home_team": home_abbr,
+        "away_team": away_abbr,
+        "situations": results,
+    }
