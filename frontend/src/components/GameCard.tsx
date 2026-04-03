@@ -26,7 +26,11 @@ function tagClass(tag: string): string {
 
 function formatMoneyline(odds: number | null): string {
   if (odds === null) return '–'
-  return odds > 0 ? `+${odds}` : `${odds}`
+  if (odds >= 2.0) {
+    return `+${Math.round((odds - 1) * 100)}`
+  } else {
+    return `${Math.round(-(100 / (odds - 1)))}`
+  }
 }
 
 const STATUS_CLASS: Record<string, string> = {
