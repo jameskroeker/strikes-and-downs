@@ -7,7 +7,11 @@ import { GameDetail } from './components/GameDetail'
 import './App.css'
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10)
+  // Use ET (UTC-4 during EDT) so the app doesn't flip to tomorrow after 8 PM MT
+  const now = new Date()
+  const etOffset = -4 * 60 // EDT = UTC-4
+  const etTime = new Date(now.getTime() + (etOffset - now.getTimezoneOffset()) * 60000)
+  return etTime.toISOString().slice(0, 10)
 }
 
 function offsetDate(dateStr: string, days: number): string {
