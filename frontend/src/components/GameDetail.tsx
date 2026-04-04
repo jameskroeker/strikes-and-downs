@@ -46,21 +46,25 @@ function WinBar({ win_pct, implied_prob }: { win_pct: number, implied_prob: numb
   )
 }
 
-function GapBadge({ value_gap }: { value_gap: number }) {
-  const pct = Math.round(value_gap * 100)
-  const isPositive = pct > 0
-  const isStrong = Math.abs(pct) >= 15
+function GapBadge({ value_gap, implied_prob, win_pct }: { value_gap: number, implied_prob: number, win_pct: number }) {
+  const gapPct = Math.round(value_gap * 100)
+  const impliedPct = Math.round(implied_prob * 100)
+  const histPct = Math.round(win_pct * 100)
+  const isPositive = gapPct > 0
+  const isStrong = Math.abs(gapPct) >= 15
   const color = isPositive ? '#4caf50' : '#f44336'
-  const icon = isStrong ? (isPositive ? '✅' : '⚠️') : (isPositive ? '↑' : '↓')
+  const icon = isStrong ? (isPositive ? '+ VALUE' : 'FADE') : (isPositive ? 'SLIGHT +' : 'SLIGHT -')
   return (
     <div style={{
-      marginTop: '6px', fontSize: '11px', color,
-      display: 'flex', alignItems: 'center', gap: '4px'
+      marginTop: '8px', fontSize: '11px', color,
+      display: 'flex', alignItems: 'center', gap: '6px',
+      background: isPositive ? 'rgba(76,175,80,0.08)' : 'rgba(244,67,54,0.08)',
+      borderRadius: '4px', padding: '4px 8px'
     }}>
-      <span>{icon}</span>
-      <span>
-        Odds imply {Math.round((value_gap > 0 ? (1 - Math.abs(value_gap)) : (1 - Math.abs(value_gap))) * 100)}% — history says {Math.abs(pct)}% {isPositive ? 'better' : 'worse'} than implied
-        <span style={{ fontWeight: 'bold', marginLeft: '4px' }}>({isPositive ? '+' : ''}{pct}%)</span>
+      <span style={{ fontWeight: 'bold', letterSpacing: '0.05em' }}>{icon}</span>
+      <span style={{ color: '#94a3b8' }}>
+        Odds imply <span style={{ color: '#e2e8f0' }}>{impliedPct}%</span> — history shows <span style={{ color }}>{histPct}%</span>
+        <span style={{ fontWeight: 'bold', marginLeft: '4px' }}>({isPositive ? '+' : ''}{gapPct}%)</span>
       </span>
     </div>
   )
@@ -87,7 +91,7 @@ function SituationCard({ sit }: { sit: Situation }) {
           </span>
         )}
       </div>
-      {hasGap && <GapBadge value_gap={sit.value_gap!} />}
+      {hasGap && sit.implied_prob && <GapBadge value_gap={sit.value_gap!} implied_prob={sit.implied_prob} win_pct={sit.win_pct} />}
     </div>
   )
 }
