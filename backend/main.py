@@ -70,7 +70,35 @@ async def fetch_master_df() -> pd.DataFrame:
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.get(PARQUET_URL)
         response.raise_for_status()
-    _master_df = pd.read_parquet(io.BytesIO(response.content))
+    df = pd.read_parquet(io.BytesIO(response.content))
+
+    # Pre-compute bucketed columns once on load — avoids recomputing on every request
+    df["_team_bucket"] = df["Win_Pct"].apply(win_pct_bucket)
+    df["_odds_bucket"] = df["h2h_own_odds"].apply(
+        lambda x: odds_bucket(x) if pd.notna(x) else None
+    )
+    df["_total_bucket"] = df["Total"].apply(
+        lambda x: total_bucket(x) if pd.notna(x) else None
+    )
+
+    # Vectorized opponent bucket — merge opponent win_pct by game_id + opponent_abbr
+    opp_pcts = df.groupby(["game_id", "team_abbr"])["Win_Pct"].first().reset_index()
+    opp_pcts.columns = ["game_id", "opponent_abbr", "_opp_win_pct"]
+    df = df.merge(opp_pcts, on=["game_id", "opponent_abbr"], how="left")
+    df["_opp_bucket"] = df["_opp_win_pct"].apply(
+        lambda x: win_pct_bucket(float(x)) if pd.notna(x) else None
+    )
+
+    # Rolling L10 bucket per team (historical pattern matching)
+    df = df.sort_values(["team_abbr", "game_date_et"])
+    df["_l10_wins"] = df.groupby("team_abbr")["team_won"].transform(
+        lambda x: x.rolling(10, min_periods=5).sum().shift(1)
+    )
+    df["_l10_bucket"] = df["_l10_wins"].apply(
+        lambda x: last_10_bucket(int(x)) if pd.notna(x) else None
+    )
+
+    _master_df = df
     _master_df_loaded_at = time.monotonic()
     return _master_df
 
@@ -420,17 +448,8 @@ def query_league_situation(
     exclude_abbr: str,
 ) -> Optional[dict]:
     """League-wide situation query excluding the specific team."""
+    # Bucketed columns already pre-computed on parquet load
     df = hist_df[hist_df["team_abbr"] != exclude_abbr].copy()
-    df["_team_bucket"] = df["Win_Pct"].apply(win_pct_bucket)
-    df["_odds_bucket"] = df["h2h_own_odds"].apply(
-        lambda x: odds_bucket(x) if pd.notna(x) else None
-    )
-    opp_win_pcts = hist_df.groupby(["game_id", "team_abbr"])["Win_Pct"].first().reset_index()
-    opp_win_pcts.columns = ["game_id", "opponent_abbr", "_opp_win_pct"]
-    df = df.merge(opp_win_pcts, on=["game_id", "opponent_abbr"], how="left")
-    df["_opp_bucket"] = df["_opp_win_pct"].apply(
-        lambda x: win_pct_bucket(float(x)) if pd.notna(x) else None
-    )
 
     if "is_home" in filters:
         df = df[df["is_home"] == filters["is_home"]]
@@ -512,28 +531,7 @@ async def get_game_situations(game_id: str, game_date: str):
 
         # Calculate last 10 for historical rows per game (rolling)
         # For situational matching we use season win_pct at time of each game
-        team_hist["_team_bucket"] = team_hist["Win_Pct"].apply(win_pct_bucket)
-        team_hist["_odds_bucket"] = team_hist["h2h_own_odds"].apply(
-            lambda x: odds_bucket(x) if pd.notna(x) else None
-        )
-        team_hist["_total_bucket"] = team_hist["Total"].apply(
-            lambda x: total_bucket(x) if pd.notna(x) else None
-        )
-
-        # Opponent bucket — join opponent win_pct at time of game
-        opp_win_pcts = hist_df.groupby(["game_id", "team_abbr"])["Win_Pct"].first().reset_index()
-        opp_win_pcts.columns = ["game_id", "opponent_abbr", "_opp_win_pct"]
-        team_hist = team_hist.merge(opp_win_pcts, on=["game_id", "opponent_abbr"], how="left")
-        team_hist["_opp_bucket"] = team_hist["_opp_win_pct"].apply(
-            lambda x: win_pct_bucket(float(x)) if pd.notna(x) else None
-        )
-
-        # Last 10 bucket — rolling wins in last 10 for each game
-        team_hist = team_hist.sort_values("game_date_et")
-        team_hist["_l10_wins"] = team_hist["team_won"].rolling(10, min_periods=5).sum().shift(1)
-        team_hist["_l10_bucket"] = team_hist["_l10_wins"].apply(
-            lambda x: last_10_bucket(int(x)) if pd.notna(x) else None
-        )
+        # Bucketed columns already pre-computed on parquet load — no recomputation needed
 
         is_fav = (own_ml < opp_ml) if (own_ml and opp_ml) else None
         t_bucket = total_bucket(total) if total else None
