@@ -425,13 +425,12 @@ def query_league_situation(
     df["_odds_bucket"] = df["h2h_own_odds"].apply(
         lambda x: odds_bucket(x) if pd.notna(x) else None
     )
-    opp_win_pcts = hist_df.groupby(["game_id", "team_abbr"])["Win_Pct"].first()
-    def get_opp_bucket(row):
-        try:
-            return win_pct_bucket(float(opp_win_pcts.loc[(row["game_id"], row["opponent_abbr"])]))
-        except (KeyError, TypeError):
-            return None
-    df["_opp_bucket"] = df.apply(get_opp_bucket, axis=1)
+    opp_win_pcts = hist_df.groupby(["game_id", "team_abbr"])["Win_Pct"].first().reset_index()
+    opp_win_pcts.columns = ["game_id", "opponent_abbr", "_opp_win_pct"]
+    df = df.merge(opp_win_pcts, on=["game_id", "opponent_abbr"], how="left")
+    df["_opp_bucket"] = df["_opp_win_pct"].apply(
+        lambda x: win_pct_bucket(float(x)) if pd.notna(x) else None
+    )
 
     if "is_home" in filters:
         df = df[df["is_home"] == filters["is_home"]]
@@ -522,16 +521,12 @@ async def get_game_situations(game_id: str, game_date: str):
         )
 
         # Opponent bucket — join opponent win_pct at time of game
-        opp_win_pcts = hist_df.groupby(["game_id", "team_abbr"])["Win_Pct"].first()
-        def get_opp_bucket(game_row):
-            try:
-                gid = game_row["game_id"]
-                opp = game_row["opponent_abbr"]
-                pct = opp_win_pcts.loc[(gid, opp)]
-                return win_pct_bucket(float(pct))
-            except (KeyError, TypeError):
-                return None
-        team_hist["_opp_bucket"] = team_hist.apply(get_opp_bucket, axis=1)
+        opp_win_pcts = hist_df.groupby(["game_id", "team_abbr"])["Win_Pct"].first().reset_index()
+        opp_win_pcts.columns = ["game_id", "opponent_abbr", "_opp_win_pct"]
+        team_hist = team_hist.merge(opp_win_pcts, on=["game_id", "opponent_abbr"], how="left")
+        team_hist["_opp_bucket"] = team_hist["_opp_win_pct"].apply(
+            lambda x: win_pct_bucket(float(x)) if pd.notna(x) else None
+        )
 
         # Last 10 bucket — rolling wins in last 10 for each game
         team_hist = team_hist.sort_values("game_date_et")
