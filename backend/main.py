@@ -98,6 +98,10 @@ async def fetch_master_df() -> pd.DataFrame:
         lambda x: last_10_bucket(int(x)) if pd.notna(x) else None
     )
 
+    # Game count bucket — games played in season at time of each game
+    df["_game_num"] = df.groupby(["team_abbr", "season"]).cumcount() + 1
+    df["_game_count_bucket"] = df["_game_num"].apply(game_count_bucket)
+
     _master_df = df
     _master_df_loaded_at = time.monotonic()
     return _master_df
@@ -321,6 +325,22 @@ def total_bucket(total: float) -> str:
     if total <= 8.5:  return "mid-high"
     return "high"
 
+def game_count_bucket(game_num: int) -> str:
+    """Bucket by games played in season — captures early/late season context."""
+    if game_num <= 20:   return "early"       # Games 1-20
+    if game_num <= 60:   return "mid-early"   # Games 21-60
+    if game_num <= 100:  return "mid"         # Games 61-100
+    if game_num <= 130:  return "mid-late"    # Games 101-130
+    return "late"                             # Games 131-162
+
+GAME_COUNT_BUCKET_LABELS = {
+    "early":    "Early season (G1-20)",
+    "mid-early": "Pre-May (G21-60)",
+    "mid":      "Mid-season (G61-100)",
+    "mid-late": "Post All-Star (G101-130)",
+    "late":     "Stretch run (G131-162)",
+}
+
 def odds_bucket(decimal_odds: float) -> str:
     """Bucket a team's own moneyline odds based on actual data distribution."""
     if decimal_odds < 1.50:  return "heavy_favorite"   # -400 to -200
@@ -393,6 +413,8 @@ def build_situation_label(filters: dict) -> str:
         parts.append(TOTAL_BUCKET_LABELS.get(filters["total_bucket"], filters["total_bucket"]))
     if filters.get("opp_bucket"):
         parts.append(f"vs {WIN_PCT_BUCKET_LABELS.get(filters['opp_bucket'], filters['opp_bucket'])} opp")
+    if filters.get("game_count_bucket"):
+        parts.append(GAME_COUNT_BUCKET_LABELS.get(filters["game_count_bucket"], filters["game_count_bucket"]))
     return " | ".join(parts)
 
 def query_situation(hist_df: pd.DataFrame, filters: dict, min_n: int = 15) -> Optional[dict]:
@@ -416,6 +438,8 @@ def query_situation(hist_df: pd.DataFrame, filters: dict, min_n: int = 15) -> Op
         df = df[df["_odds_bucket"] == filters["odds_bucket"]]
     if "total_bucket" in filters:
         df = df[df["_total_bucket"] == filters["total_bucket"]]
+    if "game_count_bucket" in filters:
+        df = df[df["_game_count_bucket"] == filters["game_count_bucket"]]
 
     # Only use completed games with known result
     df = df[df["team_won"].notna()]
@@ -461,6 +485,8 @@ def query_league_situation(
         df = df[df["_team_bucket"] == filters["team_bucket"]]
     if "opp_bucket" in filters:
         df = df[df["_opp_bucket"] == filters["opp_bucket"]]
+    if "game_count_bucket" in filters:
+        df = df[df["_game_count_bucket"] == filters["game_count_bucket"]]
 
     df = df[df["team_won"].notna()]
     n = len(df)
@@ -555,6 +581,10 @@ async def get_game_situations(game_id: str, game_date: str):
         # Define situations to test — from broadest to most specific
         # Note: total line excluded from win/loss situations — it's a scoring environment
         # signal not a winner predictor. Reserved for O/U analysis later.
+        # Current team's game count bucket in this season
+        current_game_num = len(current_season_df)
+        current_gc_bucket = game_count_bucket(current_game_num) if current_game_num > 0 else None
+
         situation_filters = [
             # Broadest baseline
             {"is_home": is_home},
@@ -567,6 +597,10 @@ async def get_game_situations(game_id: str, game_date: str):
             {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket},
             # Team quality alone (no odds bucket — broader sample)
             {"is_home": is_home, "team_bucket": team_bucket, "opp_bucket": opp_bucket},
+            # Game count context — early/late season patterns
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "game_count_bucket": current_gc_bucket},
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "game_count_bucket": current_gc_bucket},
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "opp_bucket": opp_bucket, "game_count_bucket": current_gc_bucket},
             # L10 form (only once 10+ games played)
             {"is_home": is_home, "odds_bucket": own_odds_bucket, "l10_bucket": current_l10_bucket},
             {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "l10_bucket": current_l10_bucket},
@@ -600,6 +634,8 @@ async def get_game_situations(game_id: str, game_date: str):
             {"is_home": is_home, "odds_bucket": own_odds_bucket, "opp_bucket": opp_bucket},
             {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket},
             {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket},
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "game_count_bucket": current_gc_bucket},
+            {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "game_count_bucket": current_gc_bucket},
         ]
         league_filters = [
             {k: v for k, v in f.items() if v is not None}
