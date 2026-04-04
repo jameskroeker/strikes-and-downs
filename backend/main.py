@@ -439,6 +439,8 @@ def query_situation(hist_df: pd.DataFrame, filters: dict, min_n: int = 15) -> Op
         "n": n,
         "win_pct": win_pct,
         "deviation": dev,
+        "implied_prob": None,  # filled in by caller who knows the odds
+        "value_gap": None,     # filled in by caller
     }
 
 
@@ -479,6 +481,8 @@ def query_league_situation(
         "n": n,
         "win_pct": win_pct,
         "deviation": dev,
+        "implied_prob": None,
+        "value_gap": None,
     }
 
 
@@ -574,6 +578,9 @@ async def get_game_situations(game_id: str, game_date: str):
             for f in situation_filters
         ]
 
+        # Implied probability from today's odds
+        implied_prob = round(1 / own_ml, 3) if own_ml and own_ml > 0 else None
+
         # Team-specific situations
         team_situations = []
         seen_labels = set()
@@ -581,6 +588,9 @@ async def get_game_situations(game_id: str, game_date: str):
             result = query_situation(team_hist, filters)
             if result and result["label"] not in seen_labels:
                 seen_labels.add(result["label"])
+                if implied_prob:
+                    result["implied_prob"] = implied_prob
+                    result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
                 team_situations.append(result)
         team_situations.sort(key=lambda x: x["deviation"], reverse=True)
 
@@ -601,6 +611,9 @@ async def get_game_situations(game_id: str, game_date: str):
             result = query_league_situation(hist_df, filters, exclude_abbr=abbr)
             if result and result["label"] not in seen_league_labels:
                 seen_league_labels.add(result["label"])
+                if implied_prob:
+                    result["implied_prob"] = implied_prob
+                    result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
                 league_situations.append(result)
         league_situations.sort(key=lambda x: x["deviation"], reverse=True)
 
