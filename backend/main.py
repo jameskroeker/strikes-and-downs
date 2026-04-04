@@ -504,7 +504,7 @@ async def get_game_situations(game_id: str, game_date: str):
         # Get this team's historical rows
         team_hist = hist_df[hist_df["team_abbr"] == abbr].copy()
         if team_hist.empty:
-            results[abbr] = []
+            results[abbr] = {"team_situations": [], "league_situations": []}
             continue
 
         # Get current season stats for bucketing
