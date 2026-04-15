@@ -188,3 +188,6 @@
 .tag-bounce   { background: #16a34a; color: #ffffff; border-color: #15803d; font-weight: 700; }
 .tag-warning  { background: #d97706; color: #ffffff; border-color: #b45309; font-weight: 700; }
 .tag-hot-dog  { background: #7c3aed; color: #ffffff; border-color: #6d28d9; font-weight: 700; }
+.tags-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.tags-row:last-child { margin-bottom: 0; }
+.tags-row-situational .tag { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; }

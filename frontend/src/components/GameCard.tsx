@@ -116,15 +116,28 @@ export function GameCard({ game }: Props) {
         )}
       </div>
 
-      {tags.length > 0 && (
-        <div className="tags">
-          {tags.map((tag) => (
-            <span key={tag} className={tagClass(tag)}>
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
+      {tags.length > 0 && (() => {
+        const roleTags = tags.filter(t => t.toLowerCase().includes('favorite') || t.toLowerCase().includes('underdog'))
+        const situationalTags = tags.filter(t => !t.toLowerCase().includes('favorite') && !t.toLowerCase().includes('underdog'))
+        return (
+          <div className="tags">
+            {roleTags.length > 0 && (
+              <div className="tags-row tags-row-role">
+                {roleTags.map((tag) => (
+                  <span key={tag} className={tagClass(tag)}>{tag}</span>
+                ))}
+              </div>
+            )}
+            {situationalTags.length > 0 && (
+              <div className="tags-row tags-row-situational">
+                {situationalTags.map((tag) => (
+                  <span key={tag} className={tagClass(tag)}>{tag}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }
