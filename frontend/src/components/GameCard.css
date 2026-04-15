@@ -184,3 +184,7 @@
     font-size: 2rem;
   }
 }
+.tag-fade     { background: #dc2626; color: #ffffff; border-color: #991b1b; font-weight: 700; }
+.tag-bounce   { background: #16a34a; color: #ffffff; border-color: #15803d; font-weight: 700; }
+.tag-warning  { background: #d97706; color: #ffffff; border-color: #b45309; font-weight: 700; }
+.tag-hot-dog  { background: #7c3aed; color: #ffffff; border-color: #6d28d9; font-weight: 700; }

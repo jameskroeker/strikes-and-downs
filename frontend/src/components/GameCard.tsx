@@ -17,10 +17,14 @@ function cleanStatus(val: string): string {
 
 function tagClass(tag: string): string {
   const t = tag.toLowerCase()
-  if (t.includes('favorite')) return 'tag tag-favorite'
-  if (t.includes('hot'))      return 'tag tag-hot'
-  if (t.includes('cold'))     return 'tag tag-cold'
-  if (t.includes('underdog')) return 'tag tag-underdog'
+  if (t.includes('fade spot'))        return 'tag tag-fade'
+  if (t.includes('bounce back'))      return 'tag tag-bounce'
+  if (t.includes('bad team favored')) return 'tag tag-warning'
+  if (t.includes('hot underdog'))     return 'tag tag-hot-dog'
+  if (t.includes('favorite'))         return 'tag tag-favorite'
+  if (t.includes('hot'))              return 'tag tag-hot'
+  if (t.includes('cold'))             return 'tag tag-cold'
+  if (t.includes('underdog'))         return 'tag tag-underdog'
   return 'tag'
 }
 
