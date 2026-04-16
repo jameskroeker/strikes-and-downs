@@ -101,8 +101,14 @@ async def fetch_master_df() -> pd.DataFrame:
     # Game count bucket — games played in season at time of each game
     df["_game_num"] = df.groupby(["team_abbr", "season"]).cumcount() + 1
     df["_game_count_bucket"] = df["_game_num"].apply(game_count_bucket)
+    # Shift streak forward by 1 — streak bucket represents streak ENTERING the game
+    # Win_Streak/Loss_Streak on each row is post-game, so the entering streak
+    # for game N is the streak recorded after game N-1
+    df = df.sort_values(["team_abbr", "season", "game_date_et"])
+    df["_entering_win_streak"] = df.groupby(["team_abbr", "season"])["Win_Streak"].shift(1).fillna(0).astype(int)
+    df["_entering_loss_streak"] = df.groupby(["team_abbr", "season"])["Loss_Streak"].shift(1).fillna(0).astype(int)
     df["_streak_bucket"] = df.apply(
-        lambda r: streak_bucket(int(r["Win_Streak"] or 0), int(r["Loss_Streak"] or 0)), axis=1
+        lambda r: streak_bucket(int(r["_entering_win_streak"]), int(r["_entering_loss_streak"])), axis=1
     )
 
     _master_df = df
