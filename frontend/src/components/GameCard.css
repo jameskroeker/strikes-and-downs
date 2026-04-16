@@ -191,3 +191,7 @@
 .tags-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
 .tags-row:last-child { margin-bottom: 0; }
 .tags-row-situational .tag { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; }
+.team-meta { display: flex; align-items: center; gap: 4px; justify-content: center; margin-top: 2px; }
+.role-badge { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; padding: 1px 4px; border-radius: 3px; }
+.role-fav { background: #1e3a5f; color: #93c5fd; }
+.role-dog { background: #2d1b1b; color: #fca5a5; }

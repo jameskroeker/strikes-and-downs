@@ -50,8 +50,21 @@ export function GameCard({ game }: Props) {
   const displayStatus = cleanStatus(status)
   const statusClass = STATUS_CLASS[displayStatus.toLowerCase()] ?? 'status-scheduled'
   const gameTime = cleanTime(start_time_et)
-
   const cardStatusClass = displayStatus.toLowerCase() === 'final' ? 'card-final' : 'card-scheduled'
+
+  // Determine favorite/underdog role per team
+  const homeFav = odds.moneyline_home !== null && odds.moneyline_away !== null && odds.moneyline_home < odds.moneyline_away
+  const awayFav = odds.moneyline_home !== null && odds.moneyline_away !== null && odds.moneyline_away < odds.moneyline_home
+
+  // Situational tags only — max 1, highest priority
+  const SITUATIONAL_PRIORITY = ['fade spot', 'bad team favored', 'bounce back', 'hot underdog', 'hot', 'cold']
+  const situationalTags = tags.filter(t => {
+    const tl = t.toLowerCase()
+    return !tl.includes('favorite') && !tl.includes('underdog')
+  })
+  const topSituational = SITUATIONAL_PRIORITY
+    .map(p => situationalTags.find(t => t.toLowerCase().includes(p)))
+    .find(t => t !== undefined)
 
   return (
     <div className={`game-card ${cardStatusClass}`}>
@@ -64,13 +77,12 @@ export function GameCard({ game }: Props) {
         <div className="team away">
           <div className="team-abbr">{away_team.abbr}</div>
           <div className="team-name">{away_team.name}</div>
-          <div className="team-record">
-            {away_team.wins}-{away_team.losses}
-            {away_team.win_pct > 0 && (
-              <span className="win-pct"> ({away_team.win_pct.toFixed(3)})</span>
-            )}
+          <div className="team-record">{away_team.wins}-{away_team.losses}</div>
+          <div className="team-meta">
+            {away_team.streak && <span className="team-streak">{away_team.streak}</span>}
+            {awayFav && <span className="role-badge role-fav">FAV</span>}
+            {!awayFav && homeFav && <span className="role-badge role-dog">DOG</span>}
           </div>
-          {away_team.streak && <div className="team-streak">{away_team.streak}</div>}
         </div>
 
         <div className="score-divider">
@@ -86,13 +98,12 @@ export function GameCard({ game }: Props) {
         <div className="team home">
           <div className="team-abbr">{home_team.abbr}</div>
           <div className="team-name">{home_team.name}</div>
-          <div className="team-record">
-            {home_team.wins}-{home_team.losses}
-            {home_team.win_pct > 0 && (
-              <span className="win-pct"> ({home_team.win_pct.toFixed(3)})</span>
-            )}
+          <div className="team-record">{home_team.wins}-{home_team.losses}</div>
+          <div className="team-meta">
+            {home_team.streak && <span className="team-streak">{home_team.streak}</span>}
+            {homeFav && <span className="role-badge role-fav">FAV</span>}
+            {!homeFav && awayFav && <span className="role-badge role-dog">DOG</span>}
           </div>
-          {home_team.streak && <div className="team-streak">{home_team.streak}</div>}
         </div>
       </div>
 
@@ -116,28 +127,13 @@ export function GameCard({ game }: Props) {
         )}
       </div>
 
-      {tags.length > 0 && (() => {
-        const roleTags = tags.filter(t => t.toLowerCase().includes('favorite') || t.toLowerCase().includes('underdog'))
-        const situationalTags = tags.filter(t => !t.toLowerCase().includes('favorite') && !t.toLowerCase().includes('underdog'))
-        return (
-          <div className="tags">
-            {roleTags.length > 0 && (
-              <div className="tags-row tags-row-role">
-                {roleTags.map((tag) => (
-                  <span key={tag} className={tagClass(tag)}>{tag}</span>
-                ))}
-              </div>
-            )}
-            {situationalTags.length > 0 && (
-              <div className="tags-row tags-row-situational">
-                {situationalTags.map((tag) => (
-                  <span key={tag} className={tagClass(tag)}>{tag}</span>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })()}
+      {topSituational && (
+        <div className="tags">
+          <span className={`tag ${tagClass(topSituational)}`} style={{ whiteSpace: 'nowrap' }}>
+            {topSituational}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
