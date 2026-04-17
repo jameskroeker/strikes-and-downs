@@ -845,10 +845,10 @@ async def get_date_signals(game_date: str):
             ]
             signal_filters = [f for f in signal_filters if len(f) >= 3]
 
-            # Check team history
+            # Check team history — min deviation 0.20 for signals
             for filters in signal_filters:
                 result = query_situation(team_hist, filters)
-                if result and result["n"] > 11:
+                if result and result["n"] > 11 and result["deviation"] >= 0.20:
                     if implied_prob:
                         result["implied_prob"] = implied_prob
                         result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
@@ -875,7 +875,7 @@ async def get_date_signals(game_date: str):
 
             for filters in league_signal_filters:
                 result = query_league_situation(hist_df, filters, exclude_abbr=abbr)
-                if result and result["n"] > 11:
+                if result and result["n"] > 11 and result["deviation"] >= 0.20:
                     if implied_prob:
                         result["implied_prob"] = implied_prob
                         result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
