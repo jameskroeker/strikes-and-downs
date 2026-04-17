@@ -1,5 +1,6 @@
 import type { Game } from '../types'
 import './GameCard.css'
+import { TEAM_COLORS } from '../teamColors'
 
 interface Signal {
   label: string
@@ -86,7 +87,7 @@ export function GameCard({ game, signal }: Props) {
 
       <div className="matchup">
         <div className="team away">
-          <div className="team-abbr">{away_team.abbr}</div>
+          <div className="team-abbr" style={{ color: TEAM_COLORS[away_team.abbr] ?? '#e2e8f0' }}>{away_team.abbr}</div>
           <div className="team-name">{away_team.name}</div>
           <div className="team-record">{away_team.wins}-{away_team.losses}</div>
           <div className="team-meta">
@@ -107,7 +108,7 @@ export function GameCard({ game, signal }: Props) {
         </div>
 
         <div className="team home">
-          <div className="team-abbr">{home_team.abbr}</div>
+          <div className="team-abbr" style={{ color: TEAM_COLORS[home_team.abbr] ?? '#e2e8f0' }}>{home_team.abbr}</div>
           <div className="team-name">{home_team.name}</div>
           <div className="team-record">{home_team.wins}-{home_team.losses}</div>
           <div className="team-meta">
