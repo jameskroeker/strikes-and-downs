@@ -7,7 +7,7 @@ export const TEAM_COLORS: Record<string, string> = {
   ATH: '#FFB81C', // Gold (green too dark)
   BAL: '#FC4C02', // Orange
   BOS: '#C8102E', // Red
-  CHC: '#CC3433', // Red accent (navy too dark)
+  CHC: '#1C6BB5', // Cubs royal blue
   CIN: '#BA0C2F', // Red
   CLE: '#D50032', // Red (navy too dark)
   COL: '#8A7BC8', // Lighter purple (dark purple too dark)
@@ -16,7 +16,7 @@ export const TEAM_COLORS: Record<string, string> = {
   HOU: '#CF4520', // Orange (navy too dark)
   KCR: '#B9975B', // Gold
   LAA: '#BA0C2F', // Red
-  LAD: '#6094D0', // Lighter blue (navy too dark)
+  LAD: '#1E90FF', // Dodger blue
   MIA: '#00A3E0', // Blue
   MIL: '#FFC72C', // Gold (navy too dark)
   MIN: '#BA0C2F', // Red (navy too dark)
@@ -29,7 +29,7 @@ export const TEAM_COLORS: Record<string, string> = {
   SFG: '#FA4616', // Orange
   STL: '#BA0C2F', // Red
   TBR: '#69B3E7', // Light blue
-  TEX: '#6094D0', // Lighter blue (navy too dark)
-  TOR: '#6094D0', // Lighter blue (navy too dark)
+  TEX: '#1E6FBF', // Rangers blue
+  TOR: '#1E6FBF', // Jays blue
   WSH: '#BA0C2F', // Red (navy too dark)
 }
