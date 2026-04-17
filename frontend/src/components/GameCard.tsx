@@ -1,8 +1,18 @@
 import type { Game } from '../types'
 import './GameCard.css'
 
+interface Signal {
+  label: string
+  win_pct: number
+  n: number
+  deviation: number
+  team: string
+  source: string
+}
+
 interface Props {
   game: Game
+  signal?: Signal
 }
 
 const INVALID_VALUES = new Set(['nan', 'tbd', 'none', 'nat', ''])
@@ -44,7 +54,7 @@ const STATUS_CLASS: Record<string, string> = {
   live: 'status-live',
 }
 
-export function GameCard({ game }: Props) {
+export function GameCard({ game, signal }: Props) {
   const { home_team, away_team, odds, tags, status, start_time_et, home_score, away_score } = game
   const hasScore = home_score !== null && away_score !== null
   const displayStatus = cleanStatus(status)
@@ -131,6 +141,15 @@ export function GameCard({ game }: Props) {
         <div className="tags">
           <span className={`tag ${tagClass(topSituational)}`} style={{ whiteSpace: 'nowrap' }}>
             {topSituational}
+          </span>
+        </div>
+      )}
+      {signal && (
+        <div className="signal-bar">
+          <span className="signal-team">{signal.team}</span>
+          <span className="signal-label">{signal.label.split('|').slice(1).join('|').trim()}</span>
+          <span className={`signal-pct ${signal.win_pct >= 0.6 ? 'signal-high' : signal.win_pct <= 0.4 ? 'signal-low' : ''}`}>
+            {Math.round(signal.win_pct * 100)}% <span className="signal-n">n={signal.n}</span>
           </span>
         </div>
       )}

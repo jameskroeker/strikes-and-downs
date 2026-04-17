@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
-import { fetchGamesForDate } from './api'
+import { fetchGamesForDate, fetchSignalsForDate } from './api'
 import type { Game } from './types'
 import { GameCard } from './components/GameCard'
 import { GameDetail } from './components/GameDetail'
@@ -23,6 +23,7 @@ function offsetDate(dateStr: string, days: number): string {
 function GamesList() {
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [games, setGames] = useState<Game[]>([])
+  const [signals, setSignals] = useState<Record<string, any>>({})
   const [displayDate, setDisplayDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -31,10 +32,14 @@ function GamesList() {
   useEffect(() => {
     setLoading(true)
     setError(null)
-    fetchGamesForDate(selectedDate)
-      .then((data) => {
-        setGames(data.games)
-        setDisplayDate(data.date)
+    Promise.all([
+      fetchGamesForDate(selectedDate),
+      fetchSignalsForDate(selectedDate)
+    ])
+      .then(([gamesData, signalsData]) => {
+        setGames(gamesData.games)
+        setDisplayDate(gamesData.date)
+        setSignals(signalsData)
         setLoading(false)
       })
       .catch((err: Error) => {
@@ -74,7 +79,7 @@ function GamesList() {
                   onClick={() => navigate(`/game/${game.game_id}?date=${selectedDate}`)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <GameCard game={game} />
+                  <GameCard game={game} signal={signals[game.game_id]} />
                 </div>
               ))}
             </main>

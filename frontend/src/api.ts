@@ -13,3 +13,15 @@ export async function fetchGamesForDate(date: string): Promise<GamesResponse> {
   if (!res.ok) throw new Error(`No game data for ${date}`)
   return res.json()
 }
+
+export async function fetchSignalsForDate(date: string): Promise<Record<string, any>> {
+  const res = await fetch(`${API_BASE}/signals/${date}`)
+  if (!res.ok) return {}
+  const data = await res.json()
+  // Return a map of game_id -> signal for easy lookup
+  const map: Record<string, any> = {}
+  for (const g of data.signals || []) {
+    if (g.signal) map[g.game_id] = g.signal
+  }
+  return map
+}
