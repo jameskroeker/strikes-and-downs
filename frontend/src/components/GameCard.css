@@ -202,3 +202,4 @@
 .signal-high { color: #4caf50; }
 .signal-low { color: #f44336; }
 .signal-n { font-weight: 400; color: #475569; font-size: 10px; }
+.signal-icon { font-size: 12px; cursor: pointer; opacity: 0.9; }

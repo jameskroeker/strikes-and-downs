@@ -80,6 +80,7 @@ export function GameCard({ game, signal }: Props) {
     <div className={`game-card ${cardStatusClass}`}>
       <div className="game-header">
         {gameTime && <span className="game-time">{gameTime}</span>}
+        {signal && <span className="signal-icon" title={signal.label}>⚡</span>}
         <span className={`game-status ${statusClass}`}>{displayStatus}</span>
       </div>
 
@@ -144,15 +145,7 @@ export function GameCard({ game, signal }: Props) {
           </span>
         </div>
       )}
-      {signal && (
-        <div className="signal-bar">
-          <span className="signal-team">{signal.team}</span>
-          <span className="signal-label">{signal.label.split('|').slice(1).join('|').trim()}</span>
-          <span className={`signal-pct ${signal.win_pct >= 0.6 ? 'signal-high' : signal.win_pct <= 0.4 ? 'signal-low' : ''}`}>
-            {Math.round(signal.win_pct * 100)}% <span className="signal-n">n={signal.n}</span>
-          </span>
-        </div>
-      )}
+
     </div>
   )
 }
