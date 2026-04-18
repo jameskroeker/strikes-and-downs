@@ -51,7 +51,7 @@ function GamesList() {
   return (
     <div className="app">
       <header className="header">
-        <img src="/logo.png" alt="Strikes + Downs" style={{ height: '64px', display: 'block', margin: '0 auto' }} />
+        <img src="/logo.png" alt="Strikes + Downs" style={{ height: '160px', display: 'block', margin: '0 auto' }} />
         <p className="subtitle">MLB Betting Analytics | 2026 Season</p>
       </header>
 
