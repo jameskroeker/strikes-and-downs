@@ -116,12 +116,22 @@ async def fetch_master_df() -> pd.DataFrame:
     return _master_df
 
 
+# Daily CSV cache — 5 minute TTL per date
+_daily_csv_cache: dict[str, tuple[pd.DataFrame, float]] = {}
+DAILY_CSV_CACHE_TTL = 5 * 60  # 5 minutes
+
 async def fetch_daily_csv(game_date: str) -> pd.DataFrame:
+    global _daily_csv_cache
+    cached = _daily_csv_cache.get(game_date)
+    if cached is not None and (time.monotonic() - cached[1]) < DAILY_CSV_CACHE_TTL:
+        return cached[0]
     url = DAILY_CSV_URL.format(date=game_date)
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.get(url)
         response.raise_for_status()
-    return pd.read_csv(io.StringIO(response.text))
+    df = pd.read_csv(io.StringIO(response.text))
+    _daily_csv_cache[game_date] = (df, time.monotonic())
+    return df
 
 
 def format_time_et(val) -> str:
