@@ -754,8 +754,8 @@ async def get_game_situations(game_id: str, game_date: str):
         league_situations.sort(key=lambda x: x["deviation"], reverse=True)
 
         results[abbr] = {
-            "team_situations": team_situations[:5],
-            "league_situations": league_situations[:4],
+            "team_situations": team_situations[:3],
+            "league_situations": league_situations[:3],
         }
 
     return {
