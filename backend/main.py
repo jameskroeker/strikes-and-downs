@@ -497,7 +497,7 @@ def build_situation_label(filters: dict) -> str:
         parts.append(STREAK_BUCKET_LABELS.get(filters["streak_bucket"], filters["streak_bucket"]))
     return " | ".join(parts)
 
-def query_situation(hist_df: pd.DataFrame, filters: dict, min_n: int = 15) -> Optional[dict]:
+def query_situation(hist_df: pd.DataFrame, filters: dict, min_n: int = 8) -> Optional[dict]:
     """Apply filters to historical df and return situation result if n >= min_n."""
     df = hist_df.copy()
 
@@ -574,7 +574,7 @@ def query_league_situation(
 
     df = df[df["team_won"].notna()]
     n = len(df)
-    if n < 30:
+    if n < 15:
         return None
 
     wins = int(df["team_won"].sum())
@@ -864,7 +864,7 @@ async def get_date_signals(game_date: str):
             # Check team history — min deviation 0.20 for signals
             for filters in signal_filters:
                 result = query_situation(team_hist, filters)
-                if result and result["n"] > 11 and result["deviation"] >= 0.25:
+                if result and result["n"] > 8 and result["deviation"] >= 0.25:
                     if implied_prob:
                         result["implied_prob"] = implied_prob
                         result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
@@ -891,7 +891,7 @@ async def get_date_signals(game_date: str):
 
             for filters in league_signal_filters:
                 result = query_league_situation(hist_df, filters, exclude_abbr=abbr)
-                if result and result["n"] > 11 and result["deviation"] >= 0.25:
+                if result and result["n"] > 8 and result["deviation"] >= 0.25:
                     if implied_prob:
                         result["implied_prob"] = implied_prob
                         result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
