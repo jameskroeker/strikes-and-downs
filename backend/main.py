@@ -414,22 +414,28 @@ STREAK_BUCKET_LABELS = {
 }
 
 def odds_bucket(decimal_odds: float) -> str:
-    """Bucket a team's own moneyline odds based on actual data distribution."""
-    if decimal_odds < 1.50:  return "heavy_favorite"   # -400 to -200
-    if decimal_odds < 1.75:  return "favorite"          # -200 to -133
-    if decimal_odds < 1.95:  return "slight_favorite"   # -133 to -105
-    if decimal_odds < 2.10:  return "pick"              # -105 to +110
-    if decimal_odds < 2.50:  return "slight_underdog"   # +110 to +150
-    if decimal_odds < 3.25:  return "underdog"          # +150 to +225
-    return "big_underdog"                               # +225 and up
+    """Bucket a team's own moneyline odds — 10 tiers with -200 and +150 as key anchors."""
+    if decimal_odds < 1.40:  return "heavy_favorite"    # -400 to -250
+    if decimal_odds < 1.50:  return "strong_favorite"   # -250 to -200
+    if decimal_odds < 1.65:  return "favorite"          # -200 to -154
+    if decimal_odds < 1.75:  return "mild_favorite"     # -154 to -133
+    if decimal_odds < 2.00:  return "slight_favorite"   # -133 to even
+    if decimal_odds < 2.10:  return "pick"              # even to +110
+    if decimal_odds < 2.30:  return "slight_underdog"   # +110 to +130
+    if decimal_odds < 2.50:  return "underdog"          # +130 to +150
+    if decimal_odds < 3.25:  return "clear_underdog"    # +150 to +225
+    return "big_underdog"                               # +225+
 
 ODDS_BUCKET_LABELS = {
-    "heavy_favorite":  "Heavy Favorite (-400 to -200)",
-    "favorite":        "Favorite (-200 to -133)",
-    "slight_favorite": "Slight Favorite (-133 to -105)",
-    "pick":            "Pick (-105 to +110)",
-    "slight_underdog": "Slight Underdog (+110 to +150)",
-    "underdog":        "Underdog (+150 to +225)",
+    "heavy_favorite":  "Heavy Favorite (-400 to -250)",
+    "strong_favorite": "Strong Favorite (-250 to -200)",
+    "favorite":        "Favorite (-200 to -154)",
+    "mild_favorite":   "Mild Favorite (-154 to -133)",
+    "slight_favorite": "Slight Favorite (-133 to even)",
+    "pick":            "Pick (even to +110)",
+    "slight_underdog": "Slight Underdog (+110 to +130)",
+    "underdog":        "Underdog (+130 to +150)",
+    "clear_underdog":  "Clear Underdog (+150 to +225)",
     "big_underdog":    "Big Underdog (+225+)",
 }
 
@@ -858,7 +864,7 @@ async def get_date_signals(game_date: str):
             # Check team history — min deviation 0.20 for signals
             for filters in signal_filters:
                 result = query_situation(team_hist, filters)
-                if result and result["n"] > 11 and result["deviation"] >= 0.20:
+                if result and result["n"] > 11 and result["deviation"] >= 0.25:
                     if implied_prob:
                         result["implied_prob"] = implied_prob
                         result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
@@ -885,7 +891,7 @@ async def get_date_signals(game_date: str):
 
             for filters in league_signal_filters:
                 result = query_league_situation(hist_df, filters, exclude_abbr=abbr)
-                if result and result["n"] > 11 and result["deviation"] >= 0.20:
+                if result and result["n"] > 11 and result["deviation"] >= 0.25:
                     if implied_prob:
                         result["implied_prob"] = implied_prob
                         result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
