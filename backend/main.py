@@ -771,150 +771,202 @@ async def get_game_situations(game_id: str, game_date: str):
 
 @app.get("/api/signals/{game_date}")
 async def get_date_signals(game_date: str):
-    """For each game on a slate, find the strongest 4+ dimension historical pattern.
-    Returns one signal per game — the highest deviation pattern with n>11 and 4+ filters."""
-    try:
-        daily_df, master_df = await asyncio.gather(
-            fetch_daily_csv(game_date),
-            fetch_master_df(),
-        )
-    except httpx.HTTPStatusError:
-        raise HTTPException(status_code=404, detail=f"No game data found for {game_date}")
+    """Consensus-based signal engine. Scores each game by how strongly both teams'
+    historical patterns agree on an outcome. Returns tiered signals (T1=consensus, T2=single strong)."""
 
+    daily_df, master_df = await asyncio.gather(
+        fetch_daily_csv(game_date),
+        fetch_master_df(),
+    )
     season = int(game_date[:4])
     hist_df = master_df[master_df["season"] < season].copy()
+    if daily_df is None or daily_df.empty:
+        return {"date": game_date, "games_with_signals": 0, "total_games": 0, "signals": []}
 
+    today_games = daily_df.drop_duplicates(subset=["game_id"])
     signals = []
 
-    for _, row in daily_df.iterrows():
-        home_name = str(row["home_team"])
-        away_name = str(row["away_team"])
-        home_abbr = TEAM_NAME_TO_ABBR.get(home_name, home_name[:3].upper())
-        away_abbr = TEAM_NAME_TO_ABBR.get(away_name, away_name[:3].upper())
-        game_id = str(row["game_id"])
-        ml_home = safe_float(row.get("moneyline_home"))
-        ml_away = safe_float(row.get("moneyline_away"))
-        total = safe_float(row.get("total_line"))
+    def dimension_multiplier(filters: dict) -> float:
+        has_odds = "odds_bucket" in filters
+        has_team = "team_bucket" in filters
+        has_opp = "opp_bucket" in filters
+        count = sum([has_odds, has_team, has_opp])
+        if count == 3:
+            return 1.5
+        elif count == 2:
+            return 1.0
+        else:
+            return 0.75
 
-        best_signal = None
-
-        for abbr, is_home, own_ml, opp_ml in [
-            (home_abbr, True, ml_home, ml_away),
-            (away_abbr, False, ml_away, ml_home),
-        ]:
-            team_hist = hist_df[hist_df["team_abbr"] == abbr].copy()
-            if team_hist.empty:
+    def score_patterns(patterns: list, implied_prob: float) -> tuple:
+        """Returns (directional_score, best_pattern) for a team's pattern list."""
+        total_score = 0.0
+        best = None
+        best_score = 0.0
+        for result in patterns:
+            if result["n"] < 15 or result["deviation"] < 0.15:
                 continue
+            if implied_prob:
+                result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
+                result["implied_prob"] = implied_prob
+            score = result["deviation"] * dimension_multiplier(result.get("filters", {}))
+            direction = 1.0 if result["win_pct"] > 0.50 else -1.0
+            directional = score * direction
+            total_score += directional
+            if score > best_score:
+                best_score = score
+                best = result
+        return total_score, best
 
-            season_stats = get_team_stats(master_df, abbr, season)
-            team_bucket = win_pct_bucket(season_stats["win_pct"])
+    for _, row in today_games.iterrows():
+        game_id = str(row["game_id"])
+        home_abbr = TEAM_NAME_TO_ABBR.get(str(row["home_team"]), str(row["home_team"]))
+        away_abbr = TEAM_NAME_TO_ABBR.get(str(row["away_team"]), str(row["away_team"]))
 
-            current_season_df = master_df[
-                (master_df["team_abbr"] == abbr) & (master_df["season"] == season)
-            ].sort_values("game_date_et")
+        season = int(game_date[:4])
+        current_season_home = master_df[(master_df["team_abbr"] == home_abbr) & (master_df["season"] == season)]
+        current_season_away = master_df[(master_df["team_abbr"] == away_abbr) & (master_df["season"] == season)]
 
-            current_game_num = len(current_season_df)
-            current_gc_bucket = game_count_bucket(current_game_num) if current_game_num > 0 else None
-            own_odds_bucket = odds_bucket(own_ml) if own_ml else None
-            is_fav = (own_ml < opp_ml) if (own_ml and opp_ml) else None
+        home_stats = get_team_stats(master_df, home_abbr, season)
+        away_stats = get_team_stats(master_df, away_abbr, season)
+        home_bucket = win_pct_bucket(home_stats["win_pct"])
+        away_bucket = win_pct_bucket(away_stats["win_pct"])
 
-            opp_stats = get_team_stats(master_df, away_abbr if is_home else home_abbr, season)
-            opp_bucket_val = win_pct_bucket(opp_stats["win_pct"])
+        home_ml = row.get("moneyline_home")
+        away_ml = row.get("moneyline_away")
+        home_implied = round(1 / home_ml, 3) if home_ml and home_ml > 0 else None
+        away_implied = round(1 / away_ml, 3) if away_ml and away_ml > 0 else None
 
-            latest_row = current_season_df.iloc[-1] if not current_season_df.empty else None
-            current_win_streak = int(latest_row["Win_Streak"] or 0) if latest_row is not None else 0
-            current_loss_streak = int(latest_row["Loss_Streak"] or 0) if latest_row is not None else 0
-            current_streak_bkt = streak_bucket(current_win_streak, current_loss_streak)
+        home_odds_bucket = odds_bucket(home_ml) if home_ml else None
+        away_odds_bucket = odds_bucket(away_ml) if away_ml else None
 
-            current_l10_wins = int(current_season_df.tail(10)["team_won"].sum())
-            current_l10_bkt = last_10_bucket(current_l10_wins) if len(current_season_df) >= 10 else None
+        home_latest = current_season_home.iloc[-1] if not current_season_home.empty else None
+        away_latest = current_season_away.iloc[-1] if not current_season_away.empty else None
 
-            implied_prob = round(1 / own_ml, 3) if own_ml and own_ml > 0 else None
+        home_win_streak = int(home_latest["Win_Streak"] or 0) if home_latest is not None else 0
+        home_loss_streak = int(home_latest["Loss_Streak"] or 0) if home_latest is not None else 0
+        away_win_streak = int(away_latest["Win_Streak"] or 0) if away_latest is not None else 0
+        away_loss_streak = int(away_latest["Loss_Streak"] or 0) if away_latest is not None else 0
 
-            # Test 3+ dimension filters — team history
-            signal_filters = [
-                # 3 dimensions
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket_val},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "streak_bucket": current_streak_bkt},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "opp_bucket": opp_bucket_val, "streak_bucket": current_streak_bkt},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "game_count_bucket": current_gc_bucket},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "opp_bucket": opp_bucket_val, "game_count_bucket": current_gc_bucket},
-                # 4 dimensions
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket_val, "streak_bucket": current_streak_bkt},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket_val, "game_count_bucket": current_gc_bucket},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "streak_bucket": current_streak_bkt, "game_count_bucket": current_gc_bucket},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "opp_bucket": opp_bucket_val, "streak_bucket": current_streak_bkt, "game_count_bucket": current_gc_bucket},
-                # 5 dimensions
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket_val, "streak_bucket": current_streak_bkt, "game_count_bucket": current_gc_bucket},
+        home_streak_bkt = streak_bucket(home_win_streak, home_loss_streak)
+        away_streak_bkt = streak_bucket(away_win_streak, away_loss_streak)
+
+        home_l10 = int(current_season_home.tail(10)["team_won"].sum())
+        away_l10 = int(current_season_away.tail(10)["team_won"].sum())
+        home_l10_bkt = last_10_bucket(home_l10) if len(current_season_home) >= 10 else None
+        away_l10_bkt = last_10_bucket(away_l10) if len(current_season_away) >= 10 else None
+
+        games_played_home = len(current_season_home)
+        games_played_away = len(current_season_away)
+        home_gc_bucket = game_count_bucket(games_played_home)
+        away_gc_bucket = game_count_bucket(games_played_away)
+
+        home_hist = hist_df[hist_df["team_abbr"] == home_abbr].copy()
+        away_hist = hist_df[hist_df["team_abbr"] == away_abbr].copy()
+
+        def build_filters(is_home, odds_bkt, team_bkt, opp_bkt, streak_bkt, l10_bkt, gc_bkt):
+            base = [
+                {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt},
+                {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "game_count_bucket": gc_bkt},
+                {"is_home": is_home, "odds_bucket": odds_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
+                {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
+                {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "streak_bucket": streak_bkt},
             ]
+            if l10_bkt:
+                base.append({"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "l10_bucket": l10_bkt})
+            cleaned = [{k: v for k, v in f.items() if v is not None} for f in base]
+            return [f for f in cleaned if len(f) >= 3]
 
-            if current_l10_bkt:
-                signal_filters += [
-                    {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket_val, "l10_bucket": current_l10_bkt},
-                    {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "streak_bucket": current_streak_bkt, "l10_bucket": current_l10_bkt},
-                ]
+        # Collect all patterns for home team
+        home_filters = build_filters(True, home_odds_bucket, home_bucket, away_bucket, home_streak_bkt, home_l10_bkt, home_gc_bucket)
+        home_patterns = []
+        for f in home_filters:
+            r = query_situation(home_hist, f)
+            if r:
+                r["filters"] = f
+                r["source"] = "team"
+                home_patterns.append(r)
+            r2 = query_league_situation(hist_df, f, exclude_abbr=home_abbr)
+            if r2:
+                r2["filters"] = f
+                r2["source"] = "league"
+                home_patterns.append(r2)
 
-            # Remove None values, enforce 3+ dimensions
-            signal_filters = [
-                {k: v for k, v in f.items() if v is not None}
-                for f in signal_filters
-            ]
-            signal_filters = [f for f in signal_filters if len(f) >= 3]
+        # Collect all patterns for away team
+        away_filters = build_filters(False, away_odds_bucket, away_bucket, home_bucket, away_streak_bkt, away_l10_bkt, away_gc_bucket)
+        away_patterns = []
+        for f in away_filters:
+            r = query_situation(away_hist, f)
+            if r:
+                r["filters"] = f
+                r["source"] = "team"
+                away_patterns.append(r)
+            r2 = query_league_situation(hist_df, f, exclude_abbr=away_abbr)
+            if r2:
+                r2["filters"] = f
+                r2["source"] = "league"
+                away_patterns.append(r2)
 
-            # Check team history — min deviation 0.20 for signals
-            for filters in signal_filters:
-                result = query_situation(team_hist, filters)
-                if result and result["n"] > 8 and (result["deviation"] >= 0.28 or (result["deviation"] >= 0.20 and implied_prob is not None and abs(result["win_pct"] - implied_prob) >= 0.15)):
-                    if implied_prob:
-                        result["implied_prob"] = implied_prob
-                        result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
-                    result["team"] = abbr
-                    result["is_home"] = is_home
-                    result["num_filters"] = len(filters)
-                    result["source"] = "team"
-                    if best_signal is None or result["deviation"] > best_signal["deviation"]:
-                        best_signal = result
+        # Exclude heavy favorites from signals — juice not worth it
+        if (home_odds_bucket and home_odds_bucket == "heavy_favorite") or (away_odds_bucket and away_odds_bucket == "heavy_favorite"):
+            signals.append({
+                "game_id": game_id,
+                "home_team": home_abbr,
+                "away_team": away_abbr,
+                "tier": 0,
+                "consensus_score": 0.0,
+                "signal_team": None,
+                "signal": None,
+            })
+            continue
 
-            # Check league context
-            league_signal_filters = [
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket_val},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "game_count_bucket": current_gc_bucket},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "opp_bucket": opp_bucket_val, "game_count_bucket": current_gc_bucket},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket_val, "game_count_bucket": current_gc_bucket},
-                {"is_home": is_home, "odds_bucket": own_odds_bucket, "team_bucket": team_bucket, "opp_bucket": opp_bucket_val, "streak_bucket": current_streak_bkt},
-            ]
-            league_signal_filters = [
-                {k: v for k, v in f.items() if v is not None}
-                for f in league_signal_filters
-            ]
-            league_signal_filters = [f for f in league_signal_filters if len(f) >= 3]
+        # Score both teams — positive = team wins, from home perspective
+        home_score, home_best = score_patterns(home_patterns, home_implied)
+        away_score, away_best = score_patterns(away_patterns, away_implied)
 
-            for filters in league_signal_filters:
-                result = query_league_situation(hist_df, filters, exclude_abbr=abbr)
-                if result and result["n"] > 8 and (result["deviation"] >= 0.28 or (result["deviation"] >= 0.20 and implied_prob is not None and abs(result["win_pct"] - implied_prob) >= 0.15)):
-                    if implied_prob:
-                        result["implied_prob"] = implied_prob
-                        result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
-                    result["team"] = abbr
-                    result["is_home"] = is_home
-                    result["num_filters"] = len(filters)
-                    result["source"] = "league"
-                    if best_signal is None or result["deviation"] > best_signal["deviation"]:
-                        best_signal = result
+        # Away score: positive means away team wins = negative from home perspective
+        consensus_score = round(home_score - away_score, 3)
+
+        # Determine tier
+        abs_consensus = abs(consensus_score)
+        home_abs = abs(home_score)
+        away_abs = abs(away_score)
+        single_score = max(home_abs, away_abs)
+
+        if abs_consensus >= 1.0:
+            tier = 1
+            signal_team = home_abbr if consensus_score > 0 else away_abbr
+            best_pattern = home_best if consensus_score > 0 else away_best
+        elif abs_consensus >= 0.40 or single_score >= 0.40:
+            tier = 2
+            if home_abs >= away_abs:
+                signal_team = home_abbr if home_score > 0 else away_abbr
+                best_pattern = home_best
+            else:
+                signal_team = away_abbr if away_score > 0 else home_abbr
+                best_pattern = away_best
+        else:
+            tier = 0
+            signal_team = None
+            best_pattern = None
 
         signals.append({
             "game_id": game_id,
             "home_team": home_abbr,
             "away_team": away_abbr,
-            "signal": best_signal,
+            "tier": tier,
+            "consensus_score": consensus_score,
+            "signal_team": signal_team,
+            "signal": best_pattern,
         })
 
-    # Sort — games with signals first, by deviation desc
-    signals.sort(key=lambda x: x["signal"]["deviation"] if x["signal"] else 0, reverse=True)
+    signals.sort(key=lambda x: abs(x["consensus_score"]), reverse=True)
 
     return {
         "date": game_date,
-        "games_with_signals": sum(1 for s in signals if s["signal"]),
+        "games_with_signals": sum(1 for s in signals if s["tier"] > 0),
+        "tier1_signals": sum(1 for s in signals if s["tier"] == 1),
+        "tier2_signals": sum(1 for s in signals if s["tier"] == 2),
         "total_games": len(signals),
         "signals": signals,
     }
