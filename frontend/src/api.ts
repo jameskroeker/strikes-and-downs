@@ -21,7 +21,7 @@ export async function fetchSignalsForDate(date: string): Promise<Record<string, 
   // Return a map of game_id -> signal for easy lookup
   const map: Record<string, any> = {}
   for (const g of data.signals || []) {
-    if (g.signal) map[g.game_id] = g.signal
+    if (g.tier > 0) map[g.game_id] = { ...g.signal, tier: g.tier, signal_team: g.signal_team }
   }
   return map
 }

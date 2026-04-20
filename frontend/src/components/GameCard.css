@@ -203,3 +203,5 @@
 .signal-low { color: #f44336; }
 .signal-n { font-weight: 400; color: #475569; font-size: 10px; }
 .signal-icon { font-size: 12px; cursor: pointer; opacity: 0.9; }
+.signal-bolt { font-size: 14px; text-align: center; line-height: 1; margin-bottom: 2px; cursor: pointer; }
+.team-abbr-row { display: flex; align-items: center; justify-content: center; gap: 4px; }

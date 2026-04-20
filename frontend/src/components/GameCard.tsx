@@ -9,6 +9,8 @@ interface Signal {
   deviation: number
   team: string
   source: string
+  tier?: number
+  signal_team?: string
 }
 
 interface Props {
@@ -81,13 +83,15 @@ export function GameCard({ game, signal }: Props) {
     <div className={`game-card ${cardStatusClass}`}>
       <div className="game-header">
         {gameTime && <span className="game-time">{gameTime}</span>}
-        {signal && <span className="signal-icon" title={signal.label}>⚡</span>}
         <span className={`game-status ${statusClass}`}>{displayStatus}</span>
       </div>
 
       <div className="matchup">
         <div className="team away">
-          <div className="team-abbr" style={{ color: TEAM_COLORS[away_team.abbr] ?? '#e2e8f0' }}>{away_team.abbr}</div>
+          <div className="team-abbr-row">
+            <div className="team-abbr" style={{ color: TEAM_COLORS[away_team.abbr] ?? '#e2e8f0' }}>{away_team.abbr}</div>
+            {signal && signal.signal_team === away_team.abbr && <span className="signal-bolt" title={signal.label}>{signal.tier === 1 ? "⚡⚡" : "⚡"}</span>}
+          </div>
           <div className="team-name">{away_team.name}</div>
           <div className="team-record">{away_team.wins}-{away_team.losses}</div>
           <div className="team-meta">
@@ -108,7 +112,10 @@ export function GameCard({ game, signal }: Props) {
         </div>
 
         <div className="team home">
-          <div className="team-abbr" style={{ color: TEAM_COLORS[home_team.abbr] ?? '#e2e8f0' }}>{home_team.abbr}</div>
+          <div className="team-abbr-row">
+            {signal && signal.signal_team === home_team.abbr && <span className="signal-bolt" title={signal.label}>{signal.tier === 1 ? "⚡⚡" : "⚡"}</span>}
+            <div className="team-abbr" style={{ color: TEAM_COLORS[home_team.abbr] ?? '#e2e8f0' }}>{home_team.abbr}</div>
+          </div>
           <div className="team-name">{home_team.name}</div>
           <div className="team-record">{home_team.wins}-{home_team.losses}</div>
           <div className="team-meta">
