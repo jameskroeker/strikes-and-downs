@@ -120,6 +120,10 @@ async def fetch_master_df() -> pd.DataFrame:
 _daily_csv_cache: dict[str, tuple[pd.DataFrame, float]] = {}
 DAILY_CSV_CACHE_TTL = 5 * 60  # 5 minutes
 
+# Signals cache — 5 minute TTL per date
+_signals_cache: dict[str, tuple[dict, float]] = {}
+SIGNALS_CACHE_TTL = 5 * 60  # 5 minutes
+
 async def fetch_daily_csv(game_date: str) -> pd.DataFrame:
     global _daily_csv_cache
     cached = _daily_csv_cache.get(game_date)
@@ -774,6 +778,11 @@ async def get_date_signals(game_date: str):
     """Consensus-based signal engine. Scores each game by how strongly both teams'
     historical patterns agree on an outcome. Returns tiered signals (T1=consensus, T2=single strong)."""
 
+    global _signals_cache
+    cached = _signals_cache.get(game_date)
+    if cached is not None and (time.monotonic() - cached[1]) < SIGNALS_CACHE_TTL:
+        return cached[0]
+
     daily_df, master_df = await asyncio.gather(
         fetch_daily_csv(game_date),
         fetch_master_df(),
@@ -965,7 +974,7 @@ async def get_date_signals(game_date: str):
 
     signals.sort(key=lambda x: abs(x["consensus_score"]), reverse=True)
 
-    return {
+    result = {
         "date": game_date,
         "games_with_signals": sum(1 for s in signals if s["tier"] > 0),
         "tier1_signals": sum(1 for s in signals if s["tier"] == 1),
@@ -973,3 +982,5 @@ async def get_date_signals(game_date: str):
         "total_games": len(signals),
         "signals": signals,
     }
+    _signals_cache[game_date] = (result, time.monotonic())
+    return result
