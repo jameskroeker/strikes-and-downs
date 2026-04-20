@@ -871,6 +871,9 @@ async def get_date_signals(game_date: str):
                 {"is_home": is_home, "odds_bucket": odds_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
                 {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
                 {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "streak_bucket": streak_bkt},
+                # Without odds bucket — captures strong team/opp patterns regardless of price
+                {"is_home": is_home, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
+                {"is_home": is_home, "team_bucket": team_bkt, "opp_bucket": opp_bkt},
             ]
             if l10_bkt:
                 base.append({"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "l10_bucket": l10_bkt})
@@ -937,7 +940,7 @@ async def get_date_signals(game_date: str):
             tier = 1
             signal_team = home_abbr if consensus_score > 0 else away_abbr
             best_pattern = home_best if consensus_score > 0 else away_best
-        elif abs_consensus >= 0.40 or single_score >= 0.40:
+        elif abs_consensus >= 0.60 or single_score >= 0.60:
             tier = 2
             if home_abs >= away_abs:
                 signal_team = home_abbr if home_score > 0 else away_abbr
