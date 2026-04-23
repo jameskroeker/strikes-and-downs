@@ -57,6 +57,19 @@ TEAM_NAME_TO_ABBR: dict[str, str] = {
     "Washington Nationals": "WSH",
 }
 
+TEAM_DIVISION: dict[str, str] = {
+    "NYY": "AL East", "BOS": "AL East", "TBR": "AL East", "TOR": "AL East", "BAL": "AL East",
+    "CWS": "AL Central", "CLE": "AL Central", "DET": "AL Central", "KCR": "AL Central", "MIN": "AL Central",
+    "ATH": "AL West", "HOU": "AL West", "LAA": "AL West", "SEA": "AL West", "TEX": "AL West",
+    "ATL": "NL East", "MIA": "NL East", "NYM": "NL East", "PHI": "NL East", "WSH": "NL East",
+    "CHC": "NL Central", "CIN": "NL Central", "MIL": "NL Central", "PIT": "NL Central", "STL": "NL Central",
+    "ARI": "NL West", "COL": "NL West", "LAD": "NL West", "SDP": "NL West", "SFG": "NL West",
+}
+
+TEAM_LEAGUE: dict[str, str] = {
+    abbr: div.split()[0] for abbr, div in TEAM_DIVISION.items()
+}
+
 PARQUET_CACHE_TTL = 30 * 60  # 30 minutes
 
 _master_df: Optional[pd.DataFrame] = None
@@ -772,6 +785,109 @@ async def get_game_situations(game_id: str, game_date: str):
 
 
 # ── Signals Engine ─────────────────────────────────────────────────
+
+@app.get("/api/query")
+async def query_historical(
+    is_home: Optional[str] = None,
+    odds_bucket: Optional[str] = None,
+    team_bucket: Optional[str] = None,
+    opp_bucket: Optional[str] = None,
+    game_count_bucket: Optional[str] = None,
+    streak_entering: Optional[int] = None,
+    streak_direction: Optional[str] = None,
+    rest: Optional[str] = None,
+    division_game: Optional[str] = None,
+    interleague: Optional[str] = None,
+    team_abbr: Optional[str] = None,
+):
+    """Flexible historical query endpoint for the query builder page."""
+    master_df = await fetch_master_df()
+    season = date.today().year
+    hist_df = master_df[master_df["season"] < season].copy()
+
+    if hist_df.empty:
+        return {"error": "No historical data available"}
+
+    df = hist_df.copy()
+
+    if team_abbr:
+        df = df[df["team_abbr"] == team_abbr]
+    if is_home is not None:
+        df = df[df["is_home"] == (is_home.lower() == "true")]
+    if odds_bucket:
+        df = df[df["_odds_bucket"] == odds_bucket]
+    if team_bucket:
+        df = df[df["_team_bucket"] == team_bucket]
+    if opp_bucket:
+        df = df[df["_opp_bucket"] == opp_bucket]
+    if game_count_bucket:
+        df = df[df["_game_count_bucket"] == game_count_bucket]
+
+    if streak_entering is not None and streak_direction:
+        if streak_direction.upper() == "W":
+            if streak_entering == 10:
+                df = df[df["_entering_win_streak"] >= 10]
+            else:
+                df = df[df["_entering_win_streak"] == streak_entering]
+        elif streak_direction.upper() == "L":
+            if streak_entering == 10:
+                df = df[df["_entering_loss_streak"] >= 10]
+            else:
+                df = df[df["_entering_loss_streak"] == streak_entering]
+
+    if rest is not None:
+        df = df.sort_values(["team_abbr", "game_date_et"])
+        df["_prev_game_date"] = df.groupby("team_abbr")["game_date_et"].shift(1)
+        df["_days_rest"] = (
+            pd.to_datetime(df["game_date_et"]) - pd.to_datetime(df["_prev_game_date"])
+        ).dt.days - 1
+        if rest.lower() == "b2b":
+            df = df[df["_days_rest"] == 0]
+        elif rest.lower() == "rest":
+            df = df[df["_days_rest"] >= 1]
+
+    if division_game is not None:
+        game_opp = hist_df.groupby("game_id")["team_abbr"].apply(list).to_dict()
+        def check_division(row):
+            teams = game_opp.get(row["game_id"], [])
+            opp = [t for t in teams if t != row["team_abbr"]]
+            if not opp:
+                return False
+            return TEAM_DIVISION.get(row["team_abbr"]) == TEAM_DIVISION.get(opp[0])
+        mask = df.apply(check_division, axis=1)
+        df = df[mask] if division_game.lower() == "true" else df[~mask]
+
+    if interleague is not None:
+        game_opp = hist_df.groupby("game_id")["team_abbr"].apply(list).to_dict()
+        def check_interleague(row):
+            teams = game_opp.get(row["game_id"], [])
+            opp = [t for t in teams if t != row["team_abbr"]]
+            if not opp:
+                return False
+            return TEAM_LEAGUE.get(row["team_abbr"]) != TEAM_LEAGUE.get(opp[0])
+        mask = df.apply(check_interleague, axis=1)
+        df = df[mask] if interleague.lower() == "true" else df[~mask]
+
+    df = df[df["team_won"].notna()]
+    n = len(df)
+
+    if n == 0:
+        return {"wins": 0, "losses": 0, "n": 0, "win_pct": None, "deviation": None, "message": "No matching games found"}
+
+    wins = int(df["team_won"].sum())
+    losses = n - wins
+    win_pct = round(wins / n, 3)
+    dev = round(deviation_score(wins, n), 3)
+
+    return {
+        "wins": wins,
+        "losses": losses,
+        "n": n,
+        "win_pct": win_pct,
+        "deviation": dev,
+        "sample_warning": n < 15,
+    }
+
 
 @app.get("/api/signals/{game_date}")
 async def get_date_signals(game_date: str):

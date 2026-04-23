@@ -4,6 +4,7 @@ import { fetchGamesForDate, fetchSignalsForDate } from './api'
 import type { Game } from './types'
 import { GameCard } from './components/GameCard'
 import { GameDetail } from './components/GameDetail'
+import { QueryBuilder } from './components/QueryBuilder'
 import './App.css'
 
 function todayStr(): string {
@@ -52,6 +53,9 @@ function GamesList() {
     <div className="app">
       <header className="header">
         <img src="/logo.png" alt="Strikes + Downs" style={{ height: '240px', display: 'block', margin: '0 auto' }} />
+        <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>
+          <a href="/query" style={{ color: '#64748b', fontSize: '13px', textDecoration: 'none', border: '1px solid #2a2f3e', padding: '4px 12px', borderRadius: '6px' }}>Query Builder</a>
+        </div>
         <p className="subtitle">MLB Betting Analytics | 2026 Season</p>
       </header>
 
@@ -96,6 +100,7 @@ function App() {
       <Routes>
         <Route path="/" element={<GamesList />} />
         <Route path="/game/:gameId" element={<GameDetail />} />
+        <Route path="/query" element={<QueryBuilder />} />
       </Routes>
     </BrowserRouter>
   )
