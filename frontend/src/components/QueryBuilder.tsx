@@ -203,8 +203,8 @@ export function QueryBuilder() {
                     <span className="qb-stat-label">Record</span>
                   </div>
                   <div className="qb-stat">
-                    <span className="qb-stat-value" style={{ color: deviationColor(result.deviation) }}>
-                      {(result.win_pct * 100).toFixed(1)}%
+                    <span className="qb-stat-value" style={{ color: deviationColor(result.deviation ?? 0) }}>
+                      {result.win_pct != null ? (result.win_pct * 100).toFixed(1) + "%" : "—"}
                     </span>
                     <span className="qb-stat-label">Win Rate</span>
                   </div>
@@ -213,8 +213,8 @@ export function QueryBuilder() {
                     <span className="qb-stat-label">Sample Size</span>
                   </div>
                   <div className="qb-stat">
-                    <span className="qb-stat-value" style={{ color: deviationColor(result.deviation) }}>
-                      {(result.deviation * 100).toFixed(1)}%
+                    <span className="qb-stat-value" style={{ color: deviationColor(result.deviation ?? 0) }}>
+                      {result.deviation != null ? (result.deviation * 100).toFixed(1) + "%" : "—"}
                     </span>
                     <span className="qb-stat-label">Deviation</span>
                   </div>
