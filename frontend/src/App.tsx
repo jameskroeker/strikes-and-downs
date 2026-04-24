@@ -52,7 +52,7 @@ function GamesList() {
   return (
     <div className="app">
       <header className="header">
-        <img src="/logo.png" alt="Strikes + Downs" style={{ height: '240px', display: 'block', margin: '0 auto' }} />
+        <img src="/logo.png" alt="Strikes + Downs" style={{ height: '320px', display: 'block', margin: '0 auto' }} />
         <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>
           <a href="/query" style={{ color: '#64748b', fontSize: '13px', textDecoration: 'none', border: '1px solid #2a2f3e', padding: '4px 12px', borderRadius: '6px' }}>Query Builder</a>
         </div>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 
+import { TEAM_COLORS } from '../teamColors'
+
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`
 
 interface Situation {
@@ -146,25 +148,28 @@ export function GameDetail() {
   const gameDate = searchParams.get('date') || ''
 
   const [data, setData] = useState<SituationsResponse | null>(null)
+  const [gameInfo, setGameInfo] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!gameId || !gameDate) return
     setLoading(true)
-    fetch(`${API_BASE}/games/${gameId}/situations?game_date=${gameDate}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to load situations')
-        return res.json()
-      })
-      .then(d => { setData(d); setLoading(false) })
-      .catch(err => { setError(err.message); setLoading(false) })
+    Promise.all([
+      fetch(`${API_BASE}/games/${gameId}/situations?game_date=${gameDate}`).then(r => r.json()),
+      fetch(`${API_BASE}/games/${gameDate}`).then(r => r.json()),
+    ]).then(([situations, gamesData]) => {
+      setData(situations)
+      const game = gamesData.games?.find((g: any) => String(g.game_id) === String(gameId))
+      if (game) setGameInfo(game)
+      setLoading(false)
+    }).catch(err => { setError(err.message); setLoading(false) })
   }, [gameId, gameDate])
 
   return (
     <div className="app">
       <header className="header">
-        <img src="/logo.png" alt="Strikes + Downs" style={{ height: '240px', display: 'block', margin: '0 auto' }} />
+        <img src="/logo.png" alt="Strikes + Downs" style={{ height: '320px', display: 'block', margin: '0 auto' }} />
         <p className="subtitle">MLB Betting Analytics | 2026 Season</p>
       </header>
 
@@ -184,9 +189,26 @@ export function GameDetail() {
         <main style={{ padding: '0 16px 32px', maxWidth: '760px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <div style={{ color: '#e2e8f0', fontSize: '20px', fontWeight: 'bold' }}>
-              {data.away_team} <span style={{ color: '#475569' }}>@</span> {data.home_team}
+              <span style={{ color: TEAM_COLORS[data.away_team] ?? '#e2e8f0' }}>{data.away_team}</span> <span style={{ color: '#475569' }}>@</span> <span style={{ color: TEAM_COLORS[data.home_team] ?? '#e2e8f0' }}>{data.home_team}</span>
             </div>
             <div style={{ color: '#475569', fontSize: '13px', marginTop: '4px' }}>{data.game_date}</div>
+            {gameInfo && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '8px', flexWrap: 'wrap' }}>
+                {gameInfo.start_time_et && (
+                  <span style={{ color: '#64748b', fontSize: '13px' }}>🕐 {gameInfo.start_time_et}</span>
+                )}
+                {gameInfo.odds?.moneyline_away != null && (
+                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>
+                    {data.away_team} {(() => { const o = gameInfo.odds.moneyline_away; return o >= 2 ? '+' + Math.round((o-1)*100) : '-' + Math.round(100/(o-1)) })()} 
+                    <span style={{ color: '#475569' }}> / </span>
+                    {data.home_team} {(() => { const o = gameInfo.odds.moneyline_home; return o >= 2 ? '+' + Math.round((o-1)*100) : '-' + Math.round(100/(o-1)) })()}
+                  </span>
+                )}
+                {gameInfo.odds?.total_line != null && (
+                  <span style={{ color: '#64748b', fontSize: '13px' }}>O/U {gameInfo.odds.total_line}</span>
+                )}
+              </div>
+            )}
           </div>
 
           {[data.away_team, data.home_team].map(abbr => {
