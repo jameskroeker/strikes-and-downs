@@ -1065,7 +1065,7 @@ async def get_date_signals(game_date: str):
             tier = 1
             signal_team = home_abbr if consensus_score > 0 else away_abbr
             best_pattern = home_best if consensus_score > 0 else away_best
-        elif abs_consensus >= 0.60 or single_score >= 0.60:
+        elif False:  # T2 disabled — insufficient hit rate (42.9% vs T1 70.3%)
             tier = 2
             if home_abs >= away_abs:
                 signal_team = home_abbr if home_score > 0 else away_abbr
