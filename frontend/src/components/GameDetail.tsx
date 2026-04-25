@@ -240,7 +240,7 @@ export function GameDetail() {
   return (
     <div className="app">
       <header className="header">
-        <img src="/logo.png" alt="Strikes + Downs" style={{ width: '90%', maxWidth: '400px', display: 'block', margin: '0 auto' }} />
+        <a href="/"><img src="/logo.png" alt="Strikes + Downs" style={{ width: '67%', maxWidth: '300px', display: 'block', margin: '0 auto' }} /></a>
         <p className="subtitle">MLB Betting Analytics | 2026 Season</p>
       </header>
 
