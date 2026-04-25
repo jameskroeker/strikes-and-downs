@@ -21,6 +21,7 @@ app.add_middleware(
 
 PARQUET_URL = "https://raw.githubusercontent.com/jameskroeker/mlb-betting-data-pipeline/main/data/master/master_template.parquet"
 DAILY_CSV_URL = "https://raw.githubusercontent.com/jameskroeker/mlb-betting-data-pipeline/main/data/daily/MLB_Combined_Odds_Results_{date}.csv"
+ARCHIVE_CSV_URL = "https://raw.githubusercontent.com/jameskroeker/mlb-betting-data-pipeline/main/data/archive/MLB/2026/MLB_Combined_Odds_Results_{date}.csv"
 
 # Maps full team names (as they appear in daily CSV) to parquet team_abbr values
 TEAM_NAME_TO_ABBR: dict[str, str] = {
@@ -153,6 +154,9 @@ async def fetch_daily_csv(game_date: str) -> pd.DataFrame:
     url = DAILY_CSV_URL.format(date=game_date)
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.get(url)
+        if response.status_code == 404:
+            archive_url = ARCHIVE_CSV_URL.format(date=game_date)
+            response = await client.get(archive_url)
         response.raise_for_status()
     df = pd.read_csv(io.StringIO(response.text))
     _daily_csv_cache[game_date] = (df, time.monotonic())
