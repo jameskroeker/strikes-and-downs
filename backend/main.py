@@ -918,7 +918,7 @@ async def query_historical(
 
 @app.get("/api/signals/accuracy")
 async def get_signal_accuracy():
-    """T1 accuracy since 2026-04-18. Calls signals logic per date and checks outcomes against parquet."""
+    """T1 accuracy since 2026-04-18. Reads locked signal files from GitHub — fast, drift-free."""
     global _accuracy_cache
     cached = _accuracy_cache.get("accuracy")
     if cached is not None and (time.monotonic() - cached[1]) < ACCURACY_CACHE_TTL:
@@ -930,39 +930,46 @@ async def get_signal_accuracy():
     season = 2026
     season_df = master_df[master_df["season"] == season].copy()
 
-    # Build outcomes lookup
+    # Build outcomes lookup from parquet
     completed = season_df[season_df["team_won"].notna()]
     outcomes = {}
     for _, row in completed.iterrows():
-        key = (int(row["game_id"]), row["team_abbr"])
-        outcomes[key] = bool(row["team_won"])
+        outcomes[(int(row["game_id"]), row["team_abbr"])] = bool(row["team_won"])
+
+    SIGNALS_BASE_URL = "https://raw.githubusercontent.com/jameskroeker/mlb-betting-data-pipeline/main/data/signals/signals_{date}.json"
 
     track_start = date(2026, 4, 18)
     today = date.today()
     wins = 0
     losses = 0
 
-    d = track_start
-    while d < today:
-        date_str = d.strftime("%Y-%m-%d")
-        try:
-            signals_result = await get_date_signals(date_str)
-            for g in signals_result.get("signals", []):
-                if g["tier"] != 1:
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        d = track_start
+        while d < today:
+            date_str = d.strftime("%Y-%m-%d")
+            try:
+                resp = await client.get(SIGNALS_BASE_URL.format(date=date_str))
+                if resp.status_code == 404:
+                    d += timedelta(days=1)
                     continue
-                signal_team = g.get("signal_team")
-                if not signal_team:
-                    continue
-                key = (int(g["game_id"]), signal_team)
-                if key not in outcomes:
-                    continue
-                if outcomes[key]:
-                    wins += 1
-                else:
-                    losses += 1
-        except Exception:
-            pass
-        d += timedelta(days=1)
+                resp.raise_for_status()
+                data = resp.json()
+                for g in data.get("signals", []):
+                    if g.get("tier") != 1:
+                        continue
+                    signal_team = g.get("signal_team")
+                    if not signal_team:
+                        continue
+                    key = (int(g["game_id"]), signal_team)
+                    if key not in outcomes:
+                        continue
+                    if outcomes[key]:
+                        wins += 1
+                    else:
+                        losses += 1
+            except Exception:
+                pass
+            d += timedelta(days=1)
 
     total = wins + losses
     result = {
