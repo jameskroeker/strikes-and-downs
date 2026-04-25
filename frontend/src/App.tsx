@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchGamesForDate, fetchSignalsForDate } from './api'
 import type { Game } from './types'
 import { GameCard } from './components/GameCard'
@@ -25,22 +25,28 @@ function GamesList() {
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [games, setGames] = useState<Game[]>([])
   const [signals, setSignals] = useState<Record<string, any>>({})
+  const [accuracy, setAccuracy] = useState<any>(null)
   const [displayDate, setDisplayDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const isAdmin = searchParams.get('admin') === 'true'
 
   useEffect(() => {
     setLoading(true)
     setError(null)
+    const API_BASE = `${import.meta.env.VITE_API_URL}/api`
     Promise.all([
       fetchGamesForDate(selectedDate),
-      fetchSignalsForDate(selectedDate)
+      fetchSignalsForDate(selectedDate),
+      fetch(`${API_BASE}/signals/accuracy`).then(r => r.json()).catch(() => null)
     ])
-      .then(([gamesData, signalsData]) => {
+      .then(([gamesData, signalsData, accuracyData]) => {
         setGames(gamesData.games)
         setDisplayDate(gamesData.date)
         setSignals(signalsData)
+        setAccuracy(accuracyData)
         setLoading(false)
       })
       .catch((err: Error) => {
@@ -56,6 +62,17 @@ function GamesList() {
         <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>
           <a href="/query" style={{ color: '#64748b', fontSize: '13px', textDecoration: 'none', border: '1px solid #2a2f3e', padding: '4px 12px', borderRadius: '6px' }}>Query Builder</a>
         </div>
+        {isAdmin && accuracy && accuracy.total > 0 && (
+          <div style={{ textAlign: 'center', marginTop: '6px' }}>
+            <span style={{
+              fontSize: '12px', color: '#4caf50', background: 'rgba(76,175,80,0.08)',
+              border: '1px solid rgba(76,175,80,0.25)', borderRadius: '6px',
+              padding: '3px 10px', letterSpacing: '0.04em'
+            }}>
+              T1 {accuracy.wins}-{accuracy.losses} &nbsp;·&nbsp; {Math.round(accuracy.win_pct * 100)}% &nbsp;·&nbsp; since {accuracy.since?.slice(5).replace('-', '/')}
+            </span>
+          </div>
+        )}
         <p className="subtitle">MLB Betting Analytics | 2026 Season</p>
       </header>
 
