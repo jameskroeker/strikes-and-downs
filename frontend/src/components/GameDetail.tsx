@@ -5,6 +5,52 @@ import { TEAM_COLORS } from '../teamColors'
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`
 
+function translateLabel(label: string): string {
+  const parts = label.split(' | ').map(p => p.trim()).filter(Boolean)
+  const translated = parts.map(part => {
+    part = part.replace(/^Home — Heavy Favorite.*/, 'at home as a heavy favorite')
+    part = part.replace(/^Home — Strong Favorite.*/, 'at home as a strong favorite')
+    part = part.replace(/^Home — Mild Favorite.*/, 'at home as a mild favorite')
+    part = part.replace(/^Home — Slight Favorite.*/, 'at home as a slight favorite')
+    part = part.replace(/^Home — Favorite.*/, 'at home as a favorite')
+    part = part.replace(/^Home — Pick.*/, "at home in a pick'em")
+    part = part.replace(/^Home — Slight Underdog.*/, 'at home as a slight underdog')
+    part = part.replace(/^Home — Clear Underdog.*/, 'at home as a clear underdog')
+    part = part.replace(/^Home — Big Underdog.*/, 'at home as a big underdog')
+    part = part.replace(/^Home — Underdog.*/, 'at home as an underdog')
+    part = part.replace(/^Away — Heavy Favorite.*/, 'on the road as a heavy favorite')
+    part = part.replace(/^Away — Strong Favorite.*/, 'on the road as a strong favorite')
+    part = part.replace(/^Away — Mild Favorite.*/, 'on the road as a mild favorite')
+    part = part.replace(/^Away — Slight Favorite.*/, 'on the road as a slight favorite')
+    part = part.replace(/^Away — Favorite.*/, 'on the road as a favorite')
+    part = part.replace(/^Away — Pick.*/, "on the road in a pick'em")
+    part = part.replace(/^Away — Slight Underdog.*/, 'on the road as a slight underdog')
+    part = part.replace(/^Away — Clear Underdog.*/, 'on the road as a clear underdog')
+    part = part.replace(/^Away — Big Underdog.*/, 'on the road as a big underdog')
+    part = part.replace(/^Away — Underdog.*/, 'on the road as an underdog')
+    part = part.replace(/^Elite \(59%\+\)$/, 'one of the better teams in baseball')
+    part = part.replace(/^Good \(53-58%\)$/, 'a winning team')
+    part = part.replace(/^Average \(47-52%\)$/, 'a .500 team')
+    part = part.replace(/^Poor \(41-46%\)$/, 'a losing team')
+    part = part.replace(/^Bad \(<40%\)$/, 'one of the worst teams in baseball')
+    part = part.replace(/^vs Elite.*opp$/, 'against a strong opponent')
+    part = part.replace(/^vs Good.*opp$/, 'against a winning opponent')
+    part = part.replace(/^vs Average.*opp$/, 'against an average opponent')
+    part = part.replace(/^vs Poor.*opp$/, 'against a losing opponent')
+    part = part.replace(/^vs Bad.*opp$/, 'against a struggling opponent')
+    part = part.replace(/^W3\+$/, 'on a 3+ game win streak')
+    part = part.replace(/^L3\+$/, 'on a 3+ game losing streak')
+    part = part.replace(/^Early season \(G1-20\)$/, 'early in the season')
+    part = part.replace(/^Mid season \(G21-100\)$/, 'mid-season')
+    part = part.replace(/^Late season \(G100\+\)$/, 'late in the season')
+    return part
+  })
+  const [first, ...rest] = translated
+  const capitalized = first.charAt(0).toUpperCase() + first.slice(1)
+  return rest.length === 0 ? capitalized : capitalized + ' ' + rest.join(', ')
+}
+
+
 interface Situation {
   label: string
   wins: number
@@ -72,7 +118,7 @@ function GapBadge({ value_gap, implied_prob, win_pct }: { value_gap: number, imp
   )
 }
 
-function SituationCard({ sit }: { sit: Situation }) {
+function SituationCard({ sit, plain }: { sit: Situation, plain: boolean }) {
   const hasGap = sit.value_gap !== null && Math.abs(sit.value_gap) >= 0.05
   return (
     <div style={{
@@ -82,7 +128,7 @@ function SituationCard({ sit }: { sit: Situation }) {
       border: `1px solid ${hasGap && Math.abs(sit.value_gap!) >= 0.15 ? (sit.value_gap! > 0 ? '#2e7d32' : '#b71c1c') : '#2a2f3e'}`,
     }}>
       <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '8px', lineHeight: 1.4 }}>
-        {sit.label}
+        {plain ? translateLabel(sit.label) : sit.label}
       </div>
       <WinBar win_pct={sit.win_pct} implied_prob={sit.implied_prob} />
       <div style={{ color: '#475569', fontSize: '11px', marginTop: '5px' }}>
@@ -98,19 +144,43 @@ function SituationCard({ sit }: { sit: Situation }) {
   )
 }
 
-function TeamPanel({ abbr, data }: { abbr: string, data: TeamSituations }) {
+function TeamPanel({ abbr, data, plain, isFirst, onToggle }: {
+  abbr: string
+  data: TeamSituations
+  plain: boolean
+  isFirst: boolean
+  onToggle: () => void
+}) {
   const { team_situations, league_situations } = data
   const hasTeam = team_situations.length > 0
   const hasLeague = league_situations.length > 0
 
   return (
     <div style={{ marginBottom: '40px' }}>
-      <h3 style={{
-        color: '#e2e8f0', fontSize: '16px', fontWeight: 'bold',
-        marginBottom: '20px', letterSpacing: '0.05em'
-      }}>
-        {abbr}
-      </h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <h3 style={{ color: '#e2e8f0', fontSize: '16px', fontWeight: 'bold', margin: 0, letterSpacing: '0.05em' }}>
+          {abbr}
+        </h3>
+        {isFirst && (
+          <button
+            onClick={onToggle}
+            style={{
+              background: plain ? 'rgba(147,197,253,0.12)' : 'none',
+              border: `1px solid ${plain ? '#93c5fd' : '#2a2f3e'}`,
+              color: plain ? '#93c5fd' : '#64748b',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '11px',
+              letterSpacing: '0.04em',
+              fontWeight: plain ? 'bold' : 'normal',
+              transition: 'all 0.15s'
+            }}
+          >
+            {plain ? 'DATA VIEW' : 'PLAIN ENGLISH'}
+          </button>
+        )}
+      </div>
 
       {hasTeam && (
         <>
@@ -118,7 +188,7 @@ function TeamPanel({ abbr, data }: { abbr: string, data: TeamSituations }) {
             TEAM HISTORY · 2022–2025
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
-            {team_situations.map((sit, i) => <SituationCard key={i} sit={sit} />)}
+            {team_situations.map((sit, i) => <SituationCard key={i} sit={sit} plain={plain} />)}
           </div>
         </>
       )}
@@ -129,7 +199,7 @@ function TeamPanel({ abbr, data }: { abbr: string, data: TeamSituations }) {
             LEAGUE CONTEXT · 2022–2025 · ALL TEAMS
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {league_situations.map((sit, i) => <SituationCard key={i} sit={sit} />)}
+            {league_situations.map((sit, i) => <SituationCard key={i} sit={sit} plain={plain} />)}
           </div>
         </>
       )}
@@ -151,6 +221,7 @@ export function GameDetail() {
   const [gameInfo, setGameInfo] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [plainLanguage, setPlainLanguage] = useState(false)
 
   useEffect(() => {
     if (!gameId || !gameDate) return
@@ -211,10 +282,19 @@ export function GameDetail() {
             )}
           </div>
 
-          {[data.away_team, data.home_team].map(abbr => {
+          {[data.away_team, data.home_team].map((abbr, idx) => {
             const teamData = data.situations[abbr]
             if (!teamData) return null
-            return <TeamPanel key={abbr} abbr={abbr} data={teamData} />
+            return (
+              <TeamPanel
+                key={abbr}
+                abbr={abbr}
+                data={teamData}
+                plain={plainLanguage}
+                isFirst={idx === 0}
+                onToggle={() => setPlainLanguage(p => !p)}
+              />
+            )
           })}
 
           <div style={{ color: '#374151', fontSize: '11px', textAlign: 'center', borderTop: '1px solid #1a1f2e', paddingTop: '16px' }}>
