@@ -901,165 +901,51 @@ async def query_historical(
 
 @app.get("/api/signals/accuracy")
 async def get_signal_accuracy():
-    """Returns T1 signal win/loss record for 2026 season by replaying signal logic against completed games."""
+    """T1 accuracy since 2026-04-18. Calls signals logic per date and checks outcomes against parquet."""
     global _accuracy_cache
     cached = _accuracy_cache.get("accuracy")
     if cached is not None and (time.monotonic() - cached[1]) < ACCURACY_CACHE_TTL:
         return cached[0]
 
+    from datetime import date, timedelta
+
     master_df = await fetch_master_df()
     season = 2026
-    hist_df = master_df[master_df["season"] < season].copy()
     season_df = master_df[master_df["season"] == season].copy()
 
-    if season_df.empty:
-        return {"wins": 0, "losses": 0, "total": 0, "win_pct": None, "since": None}
-
+    # Build outcomes lookup
     completed = season_df[season_df["team_won"].notna()]
-    game_dates = sorted(completed["game_date_et"].dropna().unique())
+    outcomes = {}
+    for _, row in completed.iterrows():
+        key = (int(row["game_id"]), row["team_abbr"])
+        outcomes[key] = bool(row["team_won"])
 
-    def _dim_mult(filters):
-        count = sum([
-            "odds_bucket" in filters,
-            "team_bucket" in filters,
-            "opp_bucket" in filters,
-        ])
-        return 1.5 if count == 3 else 1.0 if count == 2 else 0.75
-
-    def _score(patterns):
-        total = 0.0
-        for r in patterns:
-            if r["n"] < 15 or r["deviation"] < 0.15:
-                continue
-            score = r["deviation"] * _dim_mult(r.get("filters", {}))
-            total += score * (1.0 if r["win_pct"] > 0.50 else -1.0)
-        return total
-
-    def _build_filters(is_home, odds_bkt, team_bkt, opp_bkt, streak_bkt, l10_bkt, gc_bkt):
-        base = [
-            {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt},
-            {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "game_count_bucket": gc_bkt},
-            {"is_home": is_home, "odds_bucket": odds_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
-            {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
-            {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "streak_bucket": streak_bkt},
-            {"is_home": is_home, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
-            {"is_home": is_home, "team_bucket": team_bkt, "opp_bucket": opp_bkt},
-        ]
-        if l10_bkt:
-            base.append({"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "l10_bucket": l10_bkt})
-        cleaned = [{k: v for k, v in f.items() if v is not None} for f in base]
-        return [f for f in cleaned if len(f) >= 3]
-
+    track_start = date(2026, 4, 18)
+    today = date.today()
     wins = 0
     losses = 0
-    first_date = None
 
-    for game_date in game_dates:
-        date_str = str(game_date)[:10]
-        date_rows = completed[completed["game_date_et"].astype(str).str[:10] == date_str]
-        hist_before = master_df[
-            (master_df["season"] < season) |
-            ((master_df["season"] == season) & (master_df["game_date_et"].astype(str).str[:10] < date_str))
-        ].copy()
-        hist_before_league = hist_before.copy()
-
-        for game_id in date_rows["game_id"].unique():
-            game_rows = date_rows[date_rows["game_id"] == game_id]
-            home_rows = game_rows[game_rows["is_home"] == True]
-            away_rows = game_rows[game_rows["is_home"] == False]
-            if home_rows.empty or away_rows.empty:
-                continue
-
-            home_row = home_rows.iloc[0]
-            away_row = away_rows.iloc[0]
-            home_abbr = home_row["team_abbr"]
-            away_abbr = away_row["team_abbr"]
-
-            home_ml = home_row.get("moneyline_home") if "moneyline_home" in home_row.index else None
-            away_ml = home_row.get("moneyline_away") if "moneyline_away" in home_row.index else None
-            home_implied = round(1 / home_ml, 3) if home_ml and home_ml > 0 else None
-            away_implied = round(1 / away_ml, 3) if away_ml and away_ml > 0 else None
-
-            home_odds_bkt = odds_bucket(home_ml) if home_ml else None
-            away_odds_bkt = odds_bucket(away_ml) if away_ml else None
-            if home_odds_bkt == "heavy_favorite" or away_odds_bkt == "heavy_favorite":
-                continue
-
-            home_stats = get_team_stats(master_df, home_abbr, season)
-            away_stats = get_team_stats(master_df, away_abbr, season)
-            home_bkt = win_pct_bucket(home_stats["win_pct"])
-            away_bkt = win_pct_bucket(away_stats["win_pct"])
-
-            cur_home = season_df[(season_df["team_abbr"] == home_abbr) & (season_df["game_date_et"].astype(str).str[:10] < date_str)]
-            cur_away = season_df[(season_df["team_abbr"] == away_abbr) & (season_df["game_date_et"].astype(str).str[:10] < date_str)]
-
-            home_ws = int(cur_home.iloc[-1]["Win_Streak"] or 0) if not cur_home.empty else 0
-            home_ls = int(cur_home.iloc[-1]["Loss_Streak"] or 0) if not cur_home.empty else 0
-            away_ws = int(cur_away.iloc[-1]["Win_Streak"] or 0) if not cur_away.empty else 0
-            away_ls = int(cur_away.iloc[-1]["Loss_Streak"] or 0) if not cur_away.empty else 0
-
-            home_streak_bkt = streak_bucket(home_ws, home_ls)
-            away_streak_bkt = streak_bucket(away_ws, away_ls)
-
-            home_l10 = int(cur_home.tail(10)["team_won"].sum()) if len(cur_home) >= 10 else None
-            away_l10 = int(cur_away.tail(10)["team_won"].sum()) if len(cur_away) >= 10 else None
-            home_l10_bkt = last_10_bucket(home_l10) if home_l10 is not None else None
-            away_l10_bkt = last_10_bucket(away_l10) if away_l10 is not None else None
-
-            home_gc_bkt = game_count_bucket(len(cur_home))
-            away_gc_bkt = game_count_bucket(len(cur_away))
-
-            home_hist = hist_before[hist_before["team_abbr"] == home_abbr].copy()
-            away_hist = hist_before[hist_before["team_abbr"] == away_abbr].copy()
-
-            home_filters = _build_filters(True, home_odds_bkt, home_bkt, away_bkt, home_streak_bkt, home_l10_bkt, home_gc_bkt)
-            away_filters = _build_filters(False, away_odds_bkt, away_bkt, home_bkt, away_streak_bkt, away_l10_bkt, away_gc_bkt)
-
-            home_patterns = []
-            for f in home_filters:
-                r = query_situation(home_hist, f)
-                if r:
-                    r["filters"] = f
-                    home_patterns.append(r)
-                r2 = query_league_situation(hist_before_league, f, exclude_abbr=home_abbr)
-                if r2:
-                    r2["filters"] = f
-                    home_patterns.append(r2)
-
-            away_patterns = []
-            for f in away_filters:
-                r = query_situation(away_hist, f)
-                if r:
-                    r["filters"] = f
-                    away_patterns.append(r)
-                r2 = query_league_situation(hist_before_league, f, exclude_abbr=away_abbr)
-                if r2:
-                    r2["filters"] = f
-                    away_patterns.append(r2)
-
-            home_score = _score(home_patterns)
-            away_score = _score(away_patterns)
-            consensus_score = home_score - away_score
-
-            if abs(consensus_score) < 1.0:
-                continue
-
-            signal_team = home_abbr if consensus_score > 0 else away_abbr
-            result_row = game_rows[game_rows["team_abbr"] == signal_team]
-            if result_row.empty:
-                continue
-
-            team_won = result_row.iloc[0]["team_won"]
-            if pd.isna(team_won):
-                continue
-
-            if first_date is None:
-                first_date = date_str
-
-            if bool(team_won):
-                wins += 1
-            else:
-                losses += 1
+    d = track_start
+    while d < today:
+        date_str = d.strftime("%Y-%m-%d")
+        try:
+            signals_result = await get_date_signals(date_str)
+            for g in signals_result.get("signals", []):
+                if g["tier"] != 1:
+                    continue
+                signal_team = g.get("signal_team")
+                if not signal_team:
+                    continue
+                key = (int(g["game_id"]), signal_team)
+                if key not in outcomes:
+                    continue
+                if outcomes[key]:
+                    wins += 1
+                else:
+                    losses += 1
+        except Exception:
+            pass
+        d += timedelta(days=1)
 
     total = wins + losses
     result = {
@@ -1067,7 +953,7 @@ async def get_signal_accuracy():
         "losses": losses,
         "total": total,
         "win_pct": round(wins / total, 3) if total > 0 else None,
-        "since": first_date,
+        "since": str(track_start),
         "season": season,
     }
     _accuracy_cache["accuracy"] = (result, time.monotonic())
