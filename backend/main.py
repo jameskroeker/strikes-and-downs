@@ -298,6 +298,19 @@ def safe_int(val) -> Optional[int]:
         return None
 
 
+
+@app.on_event("startup")
+async def warmup_cache():
+    """Pre-warm accuracy cache on startup so first user request is instant."""
+    import asyncio
+    async def _warm():
+        try:
+            await get_signal_accuracy()
+            print("Accuracy cache warmed on startup")
+        except Exception as e:
+            print(f"Warmup failed: {e}")
+    asyncio.create_task(_warm())
+
 @app.get("/api/games/today")
 async def get_today_games():
     return await get_games_for_date(date.today().strftime("%Y-%m-%d"))
