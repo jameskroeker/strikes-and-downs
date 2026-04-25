@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 
-import { TEAM_COLORS } from '../teamColors'
+import { TEAM_COLORS, TEAM_NAMES } from '../teamColors'
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`
 
@@ -159,7 +159,7 @@ function TeamPanel({ abbr, data, plain, isFirst, onToggle }: {
     <div style={{ marginBottom: '40px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         <h3 style={{ color: '#e2e8f0', fontSize: '16px', fontWeight: 'bold', margin: 0, letterSpacing: '0.05em' }}>
-          {abbr}
+          {TEAM_NAMES[abbr] ?? abbr}
         </h3>
         {isFirst && (
           <button
