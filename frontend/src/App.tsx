@@ -5,6 +5,7 @@ import type { Game } from './types'
 import { GameCard } from './components/GameCard'
 import { GameDetail } from './components/GameDetail'
 import { QueryBuilder } from './components/QueryBuilder'
+import { Methodology } from './components/Methodology'
 import './App.css'
 
 function todayStr(): string {
@@ -120,6 +121,7 @@ function App() {
         <Route path="/" element={<GamesList />} />
         <Route path="/game/:gameId" element={<GameDetail />} />
         <Route path="/query" element={<QueryBuilder />} />
+        <Route path="/methodology" element={<Methodology />} />
       </Routes>
     </BrowserRouter>
   )
