@@ -185,7 +185,7 @@ function TeamPanel({ abbr, data, plain, isFirst, onToggle }: {
       {hasTeam && (
         <>
           <div style={{ color: '#93c5fd', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.08em', marginBottom: '10px' }}>
-            TEAM HISTORY · 2022–2025
+            TEAM HISTORY · 2022–2026
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
             {team_situations.map((sit, i) => <SituationCard key={i} sit={sit} plain={plain} />)}
@@ -196,7 +196,7 @@ function TeamPanel({ abbr, data, plain, isFirst, onToggle }: {
       {hasLeague && (
         <>
           <div style={{ color: '#86efac', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.08em', marginBottom: '10px' }}>
-            LEAGUE CONTEXT · 2022–2025 · ALL TEAMS
+            LEAGUE CONTEXT · 2022–2026 · ALL TEAMS
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {league_situations.map((sit, i) => <SituationCard key={i} sit={sit} plain={plain} />)}
@@ -298,7 +298,7 @@ export function GameDetail() {
           })}
 
           <div style={{ color: '#374151', fontSize: '11px', textAlign: 'center', borderTop: '1px solid #1a1f2e', paddingTop: '16px' }}>
-            Historical patterns from 2022–2025 regular season · Sample size (n) shown for context · Not a prediction
+            Historical patterns from 2022–2026 · Sample size (n) shown for context · Not a prediction
           </div>
         </main>
       )}

@@ -97,7 +97,7 @@ export function QueryBuilder() {
   return (
     <div className="app">
       <header className="header">
-        <img src="/logo.png" alt="Strikes + Downs" style={{ width: '90%', maxWidth: '400px', display: 'block', margin: '0 auto' }} />
+        <a href="/"><img src="/logo.png" alt="Strikes + Downs" style={{ width: '67%', maxWidth: '300px', display: 'block', margin: '0 auto' }} /></a>
       </header>
       <div className="qb-nav">
         <button className="qb-nav-btn" onClick={() => navigate('/')}>← Back to Games</button>
