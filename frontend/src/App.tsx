@@ -92,7 +92,8 @@ function GamesList() {
             <div className="no-games">No games found for {displayDate}.</div>
           ) : (
             <>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 0 8px 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '0 0 8px 0' }}>
+                <a href="/methodology" style={{ color: '#64748b', fontSize: '13px', textDecoration: 'none', border: '1px solid #2a2f3e', padding: '4px 12px', borderRadius: '6px' }}>How It Works</a>
                 <a href="/query" style={{ color: '#64748b', fontSize: '13px', textDecoration: 'none', border: '1px solid #2a2f3e', padding: '4px 12px', borderRadius: '6px' }}>Query Builder →</a>
               </div>
               <main className="games-grid">
