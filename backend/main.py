@@ -831,6 +831,132 @@ async def get_game_situations(game_id: str, game_date: str):
 
 # ── Signals Engine ─────────────────────────────────────────────────
 
+
+@app.get("/api/query/ou")
+async def query_ou(
+    team_abbr: Optional[str] = None,
+    is_home: Optional[str] = None,
+    total_bucket: Optional[str] = None,
+    home_l10_scored: Optional[str] = None,
+    away_l10_scored: Optional[str] = None,
+    team_bucket: Optional[str] = None,
+    opp_bucket: Optional[str] = None,
+    division_game: Optional[str] = None,
+    season_filter: Optional[str] = None,
+):
+    """O/U query endpoint. Returns over/under/push rates for historical games matching filters."""
+    master_df = await fetch_master_df()
+    season = date.today().year
+    hist_df = master_df[master_df["season"] < season].copy()
+
+    if hist_df.empty:
+        return {"error": "No historical data available"}
+
+    # Work from home team perspective to avoid double counting
+    home_df = hist_df[hist_df["is_home"] == True].copy()
+
+    # Compute total result
+    home_df = home_df[home_df["home_score"].notna() & home_df["Total"].notna()].copy()
+    home_df["_total_result"] = home_df.apply(
+        lambda r: "Over" if (r["home_score"] + r["away_score"]) > r["Total"]
+        else ("Under" if (r["home_score"] + r["away_score"]) < r["Total"] else "Push"),
+        axis=1
+    )
+
+    # Join away team L10 runs
+    away_l10 = hist_df[hist_df["is_home"] == False][["game_id", "season", "_l10_runs_scored", "_l10_runs_allowed"]].copy()
+    away_l10.columns = ["game_id", "season", "_away_l10_scored", "_away_l10_allowed"]
+    home_df = home_df.merge(away_l10, on=["game_id", "season"], how="left")
+
+    # Apply filters
+    if team_abbr:
+        home_df = home_df[home_df["team_abbr"] == team_abbr]
+
+    if is_home is not None:
+        if is_home.lower() == "true":
+            pass  # already filtering home team rows only
+        elif is_home.lower() == "false":
+            # Flip to away perspective — use away team as subject
+            away_perspective = hist_df[hist_df["is_home"] == False].copy()
+            away_perspective = away_perspective[away_perspective["home_score"].notna() & away_perspective["Total"].notna()].copy()
+            away_perspective["_total_result"] = away_perspective.apply(
+                lambda r: "Over" if (r["home_score"] + r["away_score"]) > r["Total"]
+                else ("Under" if (r["home_score"] + r["away_score"]) < r["Total"] else "Push"),
+                axis=1
+            )
+            home_l10 = hist_df[hist_df["is_home"] == True][["game_id", "season", "_l10_runs_scored", "_l10_runs_allowed"]].copy()
+            home_l10.columns = ["game_id", "season", "_away_l10_scored", "_away_l10_allowed"]
+            away_perspective = away_perspective.merge(home_l10, on=["game_id", "season"], how="left")
+            away_perspective["_l10_runs_scored"] = away_perspective["_l10_runs_scored"]
+            home_df = away_perspective
+
+    if team_bucket:
+        home_df = home_df[home_df["_team_bucket"] == team_bucket]
+
+    if opp_bucket:
+        home_df = home_df[home_df["_opp_bucket"] == opp_bucket]
+
+    if total_bucket:
+        if total_bucket == "low":
+            home_df = home_df[home_df["Total"] <= 7.0]
+        elif total_bucket == "7.5":
+            home_df = home_df[home_df["Total"] == 7.5]
+        elif total_bucket == "8":
+            home_df = home_df[home_df["Total"] == 8.0]
+        elif total_bucket == "8.5":
+            home_df = home_df[home_df["Total"] == 8.5]
+        elif total_bucket == "9":
+            home_df = home_df[home_df["Total"] == 9.0]
+        elif total_bucket == "high":
+            home_df = home_df[home_df["Total"] >= 9.5]
+
+    def apply_l10_filter(df, col, val):
+        if val == "under4":    return df[df[col] < 4.0]
+        if val == "4to4.5":    return df[(df[col] >= 4.0) & (df[col] < 4.5)]
+        if val == "4.5to5":    return df[(df[col] >= 4.5) & (df[col] < 5.0)]
+        if val == "5to5.5":    return df[(df[col] >= 5.0) & (df[col] < 5.5)]
+        if val == "5.5to6":    return df[(df[col] >= 5.5) & (df[col] < 6.0)]
+        if val == "6plus":     return df[df[col] >= 6.0]
+        return df
+
+    if home_l10_scored:
+        home_df = apply_l10_filter(home_df, "_l10_runs_scored", home_l10_scored)
+
+    if away_l10_scored:
+        home_df = apply_l10_filter(home_df, "_away_l10_scored", away_l10_scored)
+
+    if division_game is not None:
+        game_opp = hist_df.groupby("game_id")["team_abbr"].apply(list).to_dict()
+        def check_division(row):
+            teams = game_opp.get(row["game_id"], [])
+            opp = [t for t in teams if t != row["team_abbr"]]
+            if not opp: return False
+            return TEAM_DIVISION.get(row["team_abbr"]) == TEAM_DIVISION.get(opp[0])
+        mask = home_df.apply(check_division, axis=1)
+        home_df = home_df[mask] if division_game.lower() == "true" else home_df[~mask]
+
+    if season_filter:
+        home_df = home_df[home_df["season"] == int(season_filter)]
+
+    n = len(home_df)
+    if n == 0:
+        return {"over": 0, "under": 0, "push": 0, "n": 0, "over_pct": None, "under_pct": None, "message": "No matching games found"}
+
+    over = int((home_df["_total_result"] == "Over").sum())
+    under = int((home_df["_total_result"] == "Under").sum())
+    push = int((home_df["_total_result"] == "Push").sum())
+    decided = over + under
+
+    return {
+        "over": over,
+        "under": under,
+        "push": push,
+        "n": n,
+        "over_pct": round(over / decided, 3) if decided > 0 else None,
+        "under_pct": round(under / decided, 3) if decided > 0 else None,
+        "sample_warning": n < 20,
+    }
+
 @app.get("/api/query")
 async def query_historical(
     is_home: Optional[str] = None,
