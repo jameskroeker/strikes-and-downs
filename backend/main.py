@@ -112,6 +112,21 @@ async def fetch_master_df() -> pd.DataFrame:
         lambda x: last_10_bucket(int(x)) if pd.notna(x) else None
     )
 
+    # L10 runs scored and allowed per team (rolling average, shift forward 1)
+    df = df.sort_values(["team_abbr", "season", "game_date_et"])
+    df["_runs_scored"] = df.apply(
+        lambda r: r["home_score"] if r["is_home"] else r["away_score"], axis=1
+    )
+    df["_runs_allowed"] = df.apply(
+        lambda r: r["away_score"] if r["is_home"] else r["home_score"], axis=1
+    )
+    df["_l10_runs_scored"] = df.groupby(["team_abbr", "season"])["_runs_scored"].transform(
+        lambda x: x.rolling(10, min_periods=5).mean().shift(1)
+    ).round(1)
+    df["_l10_runs_allowed"] = df.groupby(["team_abbr", "season"])["_runs_allowed"].transform(
+        lambda x: x.rolling(10, min_periods=5).mean().shift(1)
+    ).round(1)
+
     # Game count bucket — games played in season at time of each game
     df["_game_num"] = df.groupby(["team_abbr", "season"]).cumcount() + 1
     df["_game_count_bucket"] = df["_game_num"].apply(game_count_bucket)
@@ -211,11 +226,16 @@ def get_team_stats(master_df: pd.DataFrame, team_abbr: str, season: int) -> dict
     loss_streak = int(latest.get("Loss_Streak") or 0)
     streak = f"W{win_streak}" if win_streak > 0 else (f"L{loss_streak}" if loss_streak > 0 else "")
 
+    l10_scored = latest.get("_l10_runs_scored")
+    l10_allowed = latest.get("_l10_runs_allowed")
+
     return {
         "wins": int(latest.get("Wins") or 0),
         "losses": int(latest.get("Losses") or 0),
         "win_pct": round(float(latest.get("Win_Pct") or 0.0), 3),
         "streak": streak,
+        "l10_runs_scored": round(float(l10_scored), 1) if pd.notna(l10_scored) else None,
+        "l10_runs_allowed": round(float(l10_allowed), 1) if pd.notna(l10_allowed) else None,
     }
 
 

@@ -280,6 +280,20 @@ export function GameDetail() {
                 )}
               </div>
             )}
+            {gameInfo && (gameInfo.away_team?.l10_runs_scored != null || gameInfo.home_team?.l10_runs_scored != null) && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '6px', flexWrap: 'wrap' }}>
+                {gameInfo.away_team?.l10_runs_scored != null && (
+                  <span style={{ color: '#64748b', fontSize: '12px' }}>
+                    {data.away_team} <span style={{ color: '#94a3b8' }}>{gameInfo.away_team.l10_runs_scored} scored</span> <span style={{ color: '#475569' }}>·</span> <span style={{ color: '#94a3b8' }}>{gameInfo.away_team.l10_runs_allowed} allowed</span> <span style={{ color: '#475569' }}>L10</span>
+                  </span>
+                )}
+                {gameInfo.home_team?.l10_runs_scored != null && (
+                  <span style={{ color: '#64748b', fontSize: '12px' }}>
+                    {data.home_team} <span style={{ color: '#94a3b8' }}>{gameInfo.home_team.l10_runs_scored} scored</span> <span style={{ color: '#475569' }}>·</span> <span style={{ color: '#94a3b8' }}>{gameInfo.home_team.l10_runs_allowed} allowed</span> <span style={{ color: '#475569' }}>L10</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {[data.away_team, data.home_team].map((abbr, idx) => {
