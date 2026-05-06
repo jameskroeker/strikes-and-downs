@@ -29,7 +29,7 @@ export function Methodology() {
         <Section title="The Signal Engine">
           <p>Every day, the signal engine scores each game by asking: do both teams' historical patterns agree on an outcome? When they do — strongly — that's a T1 signal.</p>
           <p>A T1 signal fires when the consensus score reaches 1.0 or higher. Games where one team is a heavy favorite are excluded — the juice isn't worth it.</p>
-          <p>T1 record since April 18, 2026: <span style={{ color: '#4caf50', fontWeight: 'bold' }}>28-9 (76%)</span>. Sharp bettors hit 55-57% long term. We're tracking well above that — but sample size is still small.</p>
+
         </Section>
 
         <Section title="Win% Buckets">
