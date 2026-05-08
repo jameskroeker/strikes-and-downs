@@ -108,6 +108,13 @@ async def fetch_master_df() -> pd.DataFrame:
         lambda x: win_pct_bucket(float(x)) if pd.notna(x) else None
     )
 
+    # Pre-compute rest days on full dataset — must use full df before any filtering
+    df = df.sort_values(["team_abbr", "game_date_et"])
+    df["_prev_game_date"] = df.groupby("team_abbr")["game_date_et"].shift(1)
+    df["_days_rest"] = (
+        pd.to_datetime(df["game_date_et"]) - pd.to_datetime(df["_prev_game_date"])
+    ).dt.days - 1
+
     # Rolling L10 bucket per team (historical pattern matching)
     df = df.sort_values(["team_abbr", "game_date_et"])
     df["_l10_wins"] = df.groupby("team_abbr")["team_won"].transform(
@@ -1013,11 +1020,6 @@ async def query_historical(
                 df = df[df["_entering_loss_streak"] == streak_entering]
 
     if rest is not None:
-        df = df.sort_values(["team_abbr", "game_date_et"])
-        df["_prev_game_date"] = df.groupby("team_abbr")["game_date_et"].shift(1)
-        df["_days_rest"] = (
-            pd.to_datetime(df["game_date_et"]) - pd.to_datetime(df["_prev_game_date"])
-        ).dt.days - 1
         if rest.lower() == "b2b":
             df = df[df["_days_rest"] == 0]
         elif rest.lower() == "rest":
