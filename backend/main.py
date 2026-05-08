@@ -227,8 +227,6 @@ def get_team_stats(master_df: pd.DataFrame, team_abbr: str, season: int) -> dict
     team_data["game_date_et"] = pd.to_datetime(team_data["game_date_et"], errors="coerce")
     sorted_data = team_data.sort_values("game_date_et")
     latest = sorted_data.iloc[-1]
-    # Use second-to-last row for entering win_pct — post-game value is contaminated
-    entering = sorted_data.iloc[-2] if len(sorted_data) >= 2 else latest
 
     win_streak = int(latest.get("Win_Streak") or 0)
     loss_streak = int(latest.get("Loss_Streak") or 0)
@@ -240,7 +238,7 @@ def get_team_stats(master_df: pd.DataFrame, team_abbr: str, season: int) -> dict
     return {
         "wins": int(latest.get("Wins") or 0),
         "losses": int(latest.get("Losses") or 0),
-        "win_pct": round(float(entering.get("Win_Pct") or 0.0), 3),
+        "win_pct": round(float(latest.get("Win_Pct") or 0.0), 3),
         "streak": streak,
         "l10_runs_scored": round(float(l10_scored), 1) if pd.notna(l10_scored) else None,
         "l10_runs_allowed": round(float(l10_allowed), 1) if pd.notna(l10_allowed) else None,
