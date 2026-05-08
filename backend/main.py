@@ -87,7 +87,12 @@ async def fetch_master_df() -> pd.DataFrame:
     df = pd.read_parquet(io.BytesIO(response.content))
 
     # Pre-compute bucketed columns once on load — avoids recomputing on every request
-    df["_team_bucket"] = df["Win_Pct"].apply(win_pct_bucket)
+    # Use entering win_pct (shifted forward 1) to avoid post-game contamination
+    df = df.sort_values(["team_abbr", "game_date_et"])
+    df["_entering_win_pct"] = df.groupby("team_abbr")["Win_Pct"].shift(1)
+    df["_team_bucket"] = df["_entering_win_pct"].apply(
+        lambda x: win_pct_bucket(float(x)) if pd.notna(x) else win_pct_bucket(0.0)
+    )
     df["_odds_bucket"] = df["h2h_own_odds"].apply(
         lambda x: odds_bucket(x) if pd.notna(x) else None
     )
@@ -95,8 +100,8 @@ async def fetch_master_df() -> pd.DataFrame:
         lambda x: total_bucket(x) if pd.notna(x) else None
     )
 
-    # Vectorized opponent bucket — merge opponent win_pct by game_id + opponent_abbr
-    opp_pcts = df.groupby(["game_id", "team_abbr"])["Win_Pct"].first().reset_index()
+    # Vectorized opponent bucket — use entering win_pct for opponent as well
+    opp_pcts = df.groupby(["game_id", "team_abbr"])["_entering_win_pct"].first().reset_index()
     opp_pcts.columns = ["game_id", "opponent_abbr", "_opp_win_pct"]
     df = df.merge(opp_pcts, on=["game_id", "opponent_abbr"], how="left")
     df["_opp_bucket"] = df["_opp_win_pct"].apply(
@@ -220,7 +225,10 @@ def get_team_stats(master_df: pd.DataFrame, team_abbr: str, season: int) -> dict
         return {"wins": 0, "losses": 0, "win_pct": 0.0, "streak": ""}
 
     team_data["game_date_et"] = pd.to_datetime(team_data["game_date_et"], errors="coerce")
-    latest = team_data.sort_values("game_date_et").iloc[-1]
+    sorted_data = team_data.sort_values("game_date_et")
+    latest = sorted_data.iloc[-1]
+    # Use second-to-last row for entering win_pct — post-game value is contaminated
+    entering = sorted_data.iloc[-2] if len(sorted_data) >= 2 else latest
 
     win_streak = int(latest.get("Win_Streak") or 0)
     loss_streak = int(latest.get("Loss_Streak") or 0)
@@ -232,7 +240,7 @@ def get_team_stats(master_df: pd.DataFrame, team_abbr: str, season: int) -> dict
     return {
         "wins": int(latest.get("Wins") or 0),
         "losses": int(latest.get("Losses") or 0),
-        "win_pct": round(float(latest.get("Win_Pct") or 0.0), 3),
+        "win_pct": round(float(entering.get("Win_Pct") or 0.0), 3),
         "streak": streak,
         "l10_runs_scored": round(float(l10_scored), 1) if pd.notna(l10_scored) else None,
         "l10_runs_allowed": round(float(l10_allowed), 1) if pd.notna(l10_allowed) else None,

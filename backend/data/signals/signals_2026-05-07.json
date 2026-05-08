@@ -1,0 +1,34 @@
+{
+  "date": "2026-05-07",
+  "locked_at": "2026-05-07T15:33:51Z",
+  "t1_count": 3,
+  "signals": [
+    {
+      "game_id": "178566",
+      "game_date": "2026-05-07",
+      "home_team": "NYY",
+      "away_team": "TEX",
+      "signal_team": "NYY",
+      "consensus_score": 3.804,
+      "tier": 1
+    },
+    {
+      "game_id": "178573",
+      "game_date": "2026-05-07",
+      "home_team": "CHC",
+      "away_team": "CIN",
+      "signal_team": "CHC",
+      "consensus_score": 1.53,
+      "tier": 1
+    },
+    {
+      "game_id": "178567",
+      "game_date": "2026-05-07",
+      "home_team": "SDP",
+      "away_team": "STL",
+      "signal_team": "SDP",
+      "consensus_score": 1.218,
+      "tier": 1
+    }
+  ]
+}
