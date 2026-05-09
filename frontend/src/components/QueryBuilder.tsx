@@ -269,7 +269,7 @@ export function QueryBuilder() {
         {mode === 'ou' && (
           <div className="qb-filters">
             <div className="qb-filter-group">
-              <label className="qb-label">Home Team</label>
+              <label className="qb-label">Team</label>
               <select className="qb-select" value={ouFilters.team_abbr} onChange={e => setOuFilter('team_abbr', e.target.value)}>
                 <option value="">Any</option>
                 {TEAMS.filter(t => t).map(t => <option key={t} value={t}>{t}</option>)}
