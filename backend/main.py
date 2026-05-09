@@ -846,9 +846,23 @@ async def get_game_situations(game_id: str, game_date: str):
                 league_situations.append(result)
         league_situations.sort(key=lambda x: x["deviation"], reverse=True)
 
+        # Pythagorean divergence flag for this team
+        actual_wp = season_stats.get("win_pct", 0.0)
+        pyth_wp = season_stats.get("pyth_win_pct")
+        pyth_flag = None
+        if pyth_wp is not None:
+            divergence = round(pyth_wp - actual_wp, 3)
+            if divergence >= 0.05:
+                pyth_flag = {"label": "Unlucky", "divergence": divergence}
+            elif divergence <= -0.05:
+                pyth_flag = {"label": "Lucky", "divergence": divergence}
+
         results[abbr] = {
             "team_situations": team_situations[:3],
             "league_situations": league_situations[:3],
+            "pyth_flag": pyth_flag,
+            "pyth_win_pct": pyth_wp,
+            "actual_win_pct": actual_wp,
         }
 
     return {
