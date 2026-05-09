@@ -853,9 +853,9 @@ async def get_game_situations(game_id: str, game_date: str):
         if pyth_wp is not None:
             divergence = round(pyth_wp - actual_wp, 3)
             if divergence >= 0.05:
-                pyth_flag = {"label": "Unlucky", "divergence": divergence}
+                pyth_flag = {"label": "Underperforming", "divergence": divergence}
             elif divergence <= -0.05:
-                pyth_flag = {"label": "Lucky", "divergence": divergence}
+                pyth_flag = {"label": "Overperforming", "divergence": divergence}
 
         results[abbr] = {
             "team_situations": team_situations[:3],
@@ -1390,18 +1390,18 @@ async def get_date_signals(game_date: str):
             if pyth_wp is not None:
                 divergence = round(pyth_wp - actual_wp, 3)
                 if divergence >= 0.05:
-                    pyth_flag = {"label": "Unlucky", "divergence": divergence}
+                    pyth_flag = {"label": "Underperforming", "divergence": divergence}
                 elif divergence <= -0.05:
-                    pyth_flag = {"label": "Lucky", "divergence": divergence}
+                    pyth_flag = {"label": "Overperforming", "divergence": divergence}
             # Opponent divergence
             opp_actual_wp = opp_stats_pyth.get("win_pct", 0.0)
             opp_pyth_wp = opp_stats_pyth.get("pyth_win_pct")
             if opp_pyth_wp is not None:
                 opp_divergence = round(opp_pyth_wp - opp_actual_wp, 3)
                 if opp_divergence >= 0.05:
-                    opp_pyth_flag = {"label": "Unlucky", "divergence": opp_divergence}
+                    opp_pyth_flag = {"label": "Underperforming", "divergence": opp_divergence}
                 elif opp_divergence <= -0.05:
-                    opp_pyth_flag = {"label": "Lucky", "divergence": opp_divergence}
+                    opp_pyth_flag = {"label": "Overperforming", "divergence": opp_divergence}
 
         signals.append({
             "game_id": game_id,

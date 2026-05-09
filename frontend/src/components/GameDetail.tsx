@@ -65,6 +65,9 @@ interface Situation {
 interface TeamSituations {
   team_situations: Situation[]
   league_situations: Situation[]
+  pyth_flag: { label: string, divergence: number } | null
+  pyth_win_pct: number | null
+  actual_win_pct: number | null
 }
 
 interface SituationsResponse {
@@ -181,6 +184,19 @@ function TeamPanel({ abbr, data, plain, isFirst, onToggle }: {
           </button>
         )}
       </div>
+
+      {data.pyth_flag && (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: '6px',
+          background: data.pyth_flag.label === 'Underperforming' ? 'rgba(74,222,128,0.1)' : 'rgba(251,191,36,0.1)',
+          border: '1px solid ' + (data.pyth_flag.label === 'Underperforming' ? '#4ade80' : '#fbbf24'),
+          borderRadius: '6px', padding: '4px 10px', marginBottom: '16px',
+          fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.06em',
+          color: data.pyth_flag.label === 'Underperforming' ? '#4ade80' : '#fbbf24'
+        }}>
+          {data.pyth_flag.label === 'Underperforming' ? '📈' : '📉'} {data.pyth_flag.label.toUpperCase()} · Pyth {Math.round((data.pyth_win_pct ?? 0) * 100)}% vs Actual {Math.round((data.actual_win_pct ?? 0) * 100)}%
+        </div>
+      )}
 
       {hasTeam && (
         <>
