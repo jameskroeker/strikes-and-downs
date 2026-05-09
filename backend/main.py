@@ -139,6 +139,22 @@ async def fetch_master_df() -> pd.DataFrame:
         lambda x: x.rolling(10, min_periods=5).mean().shift(1)
     ).round(1)
 
+    # Pythagorean win% — cumulative season RS/RA entering each game, shifted forward 1
+    df = df.sort_values(["team_abbr", "season", "game_date_et"])
+    df["_season_rs"] = df.groupby(["team_abbr", "season"])["_runs_scored"].transform(
+        lambda x: x.shift(1).cumsum()
+    )
+    df["_season_ra"] = df.groupby(["team_abbr", "season"])["_runs_allowed"].transform(
+        lambda x: x.shift(1).cumsum()
+    )
+    def pythagorean_win_pct(rs, ra):
+        if pd.isna(rs) or pd.isna(ra) or ra == 0 or rs == 0:
+            return None
+        return round(rs**1.83 / (rs**1.83 + ra**1.83), 3)
+    df["_pyth_win_pct"] = df.apply(
+        lambda r: pythagorean_win_pct(r["_season_rs"], r["_season_ra"]), axis=1
+    )
+
     # Game count bucket — games played in season at time of each game
     df["_game_num"] = df.groupby(["team_abbr", "season"]).cumcount() + 1
     df["_game_count_bucket"] = df["_game_num"].apply(game_count_bucket)
@@ -241,6 +257,7 @@ def get_team_stats(master_df: pd.DataFrame, team_abbr: str, season: int) -> dict
 
     l10_scored = latest.get("_l10_runs_scored")
     l10_allowed = latest.get("_l10_runs_allowed")
+    pyth_win_pct = latest.get("_pyth_win_pct")
 
     return {
         "wins": int(latest.get("Wins") or 0),
@@ -249,6 +266,7 @@ def get_team_stats(master_df: pd.DataFrame, team_abbr: str, season: int) -> dict
         "streak": streak,
         "l10_runs_scored": round(float(l10_scored), 1) if pd.notna(l10_scored) else None,
         "l10_runs_allowed": round(float(l10_allowed), 1) if pd.notna(l10_allowed) else None,
+        "pyth_win_pct": round(float(pyth_win_pct), 3) if pd.notna(pyth_win_pct) else None,
     }
 
 
@@ -1326,6 +1344,51 @@ async def get_date_signals(game_date: str):
             signal_team = None
             best_pattern = None
 
+        # Pythagorean boost — near-T1 games (0.75-0.99) can be promoted if Pythagorean agrees
+        if tier == 0 and abs_consensus >= 0.75:
+            candidate_team = home_abbr if consensus_score > 0 else away_abbr
+            candidate_opp = away_abbr if consensus_score > 0 else home_abbr
+            candidate_stats = home_stats if consensus_score > 0 else away_stats
+            opp_candidate_stats = away_stats if consensus_score > 0 else home_stats
+            candidate_actual = candidate_stats.get("win_pct", 0.0)
+            candidate_pyth = candidate_stats.get("pyth_win_pct")
+            opp_actual = opp_candidate_stats.get("win_pct", 0.0)
+            opp_pyth = opp_candidate_stats.get("pyth_win_pct")
+            boost = False
+            if candidate_pyth is not None and round(candidate_pyth - candidate_actual, 3) >= 0.05:
+                boost = True  # Signal team is Unlucky — better than record
+            if opp_pyth is not None and round(opp_actual - opp_pyth, 3) >= 0.05:
+                boost = True  # Opponent is Lucky — worse than record
+            if boost:
+                tier = 1
+                signal_team = candidate_team
+                best_pattern = home_best if consensus_score > 0 else away_best
+
+        # Pythagorean divergence for signal team and opponent
+        pyth_flag = None
+        opp_pyth_flag = None
+        if signal_team:
+            st_stats = home_stats if signal_team == home_abbr else away_stats
+            opp_stats_pyth = away_stats if signal_team == home_abbr else home_stats
+            # Signal team divergence
+            actual_wp = st_stats.get("win_pct", 0.0)
+            pyth_wp = st_stats.get("pyth_win_pct")
+            if pyth_wp is not None:
+                divergence = round(pyth_wp - actual_wp, 3)
+                if divergence >= 0.05:
+                    pyth_flag = {"label": "Unlucky", "divergence": divergence}
+                elif divergence <= -0.05:
+                    pyth_flag = {"label": "Lucky", "divergence": divergence}
+            # Opponent divergence
+            opp_actual_wp = opp_stats_pyth.get("win_pct", 0.0)
+            opp_pyth_wp = opp_stats_pyth.get("pyth_win_pct")
+            if opp_pyth_wp is not None:
+                opp_divergence = round(opp_pyth_wp - opp_actual_wp, 3)
+                if opp_divergence >= 0.05:
+                    opp_pyth_flag = {"label": "Unlucky", "divergence": opp_divergence}
+                elif opp_divergence <= -0.05:
+                    opp_pyth_flag = {"label": "Lucky", "divergence": opp_divergence}
+
         signals.append({
             "game_id": game_id,
             "home_team": home_abbr,
@@ -1334,6 +1397,8 @@ async def get_date_signals(game_date: str):
             "consensus_score": consensus_score,
             "signal_team": signal_team,
             "signal": best_pattern,
+            "pyth_flag": pyth_flag,
+            "opp_pyth_flag": opp_pyth_flag,
         })
 
     signals.sort(key=lambda x: abs(x["consensus_score"]), reverse=True)
