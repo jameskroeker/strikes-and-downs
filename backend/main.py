@@ -200,7 +200,8 @@ async def fetch_daily_csv(game_date: str) -> pd.DataFrame:
         if response.status_code == 404:
             archive_url = ARCHIVE_CSV_URL.format(date=game_date)
             response = await client.get(archive_url)
-        response.raise_for_status()
+        if not response.is_success:
+            return pd.DataFrame()
     df = pd.read_csv(io.StringIO(response.text))
     _daily_csv_cache[game_date] = (df, time.monotonic())
     return df
