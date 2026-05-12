@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { fetchGamesForDate, fetchSignalsForDate } from '../api'
+import type { Game } from '../types'
+import { TEAM_COLORS } from '../teamColors'
 import './QueryBuilder.css'
 
 const ODDS_BUCKETS = [
@@ -81,9 +84,77 @@ function ouColor(pct: number): string {
   return '#94a3b8'
 }
 
+function formatML(ml: number | null): string {
+  if (!ml) return '-'
+  if (ml >= 2.0) return '+' + String(Math.round((ml - 1) * 100))
+  return String(Math.round(-(100 / (ml - 1))))
+}
+
+function getTodayET(): string {
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' })
+  return fmt.format(new Date())
+}
+
+function GameStrip({ games, signals }: { games: Game[], signals: Record<string, any> }) {
+  return (
+    <div style={{ overflowX: 'auto', paddingBottom: '8px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', gap: '10px', minWidth: 'max-content', padding: '4px 2px' }}>
+        {games.map(game => {
+          const sig = signals[game.game_id]
+          const isT1 = sig && sig.tier === 1
+          const awayColor = TEAM_COLORS[game.away_team.abbr] || '#94a3b8'
+          const homeColor = TEAM_COLORS[game.home_team.abbr] || '#94a3b8'
+          return (
+            <div key={game.game_id} style={{
+              background: '#1a1f2e',
+              border: isT1 ? '1px solid #facc15' : '1px solid #2a2f3e',
+              borderRadius: '8px', padding: '10px 14px',
+              minWidth: '185px', fontSize: '12px',
+              color: '#94a3b8', position: 'relative',
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: awayColor, fontWeight: 'bold', fontSize: '13px' }}>{game.away_team.abbr}{isT1 && sig.signal_team === game.away_team.abbr ? ' ⚡⚡' : ''}</span>
+                  <span style={{ color: '#64748b', fontSize: '11px' }}>{game.away_team.wins}-{game.away_team.losses} · {(game.away_team.win_pct * 100).toFixed(0)}%</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b' }}>
+                  <span>{(game.away_team as any).l10_runs_scored ?? '-'} RS · {(game.away_team as any).l10_runs_allowed ?? '-'} RA</span>
+                  <span>{formatML(game.odds.moneyline_away)}</span>
+                  <span style={{ color: game.away_team.streak.startsWith('W') ? '#4caf50' : '#ef4444' }}>{game.away_team.streak}</span>
+                </div>
+                <div style={{ borderTop: '1px solid #2a2f3e', margin: '2px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: homeColor, fontWeight: 'bold', fontSize: '13px' }}>{game.home_team.abbr}{isT1 && sig.signal_team === game.home_team.abbr ? ' ⚡⚡' : ''}</span>
+                  <span style={{ color: '#64748b', fontSize: '11px' }}>{game.home_team.wins}-{game.home_team.losses} · {(game.home_team.win_pct * 100).toFixed(0)}%</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b' }}>
+                  <span>{(game.home_team as any).l10_runs_scored ?? '-'} RS · {(game.home_team as any).l10_runs_allowed ?? '-'} RA</span>
+                  <span>{formatML(game.odds.moneyline_home)}</span>
+                  <span style={{ color: game.home_team.streak.startsWith('W') ? '#4caf50' : '#ef4444' }}>{game.home_team.streak}</span>
+                </div>
+                {game.odds.total_line && (
+                  <div style={{ textAlign: 'center', color: '#64748b', fontSize: '11px', marginTop: '2px' }}>O/U {game.odds.total_line}</div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function QueryBuilder() {
   const navigate = useNavigate()
   const [mode, setMode] = useState<'sides' | 'ou'>('sides')
+  const [games, setGames] = useState<Game[]>([])
+  const [signals, setSignals] = useState<Record<string, any>>({})
+
+  useEffect(() => {
+    const today = getTodayET()
+    fetchGamesForDate(today).then(r => setGames(r.games)).catch(() => {})
+    fetchSignalsForDate(today).then(s => setSignals(s)).catch(() => {})
+  }, [])
 
   const [filters, setFilters] = useState({
     team_abbr: '', is_home: '', odds_bucket: '', team_bucket: '',
@@ -153,6 +224,13 @@ export function QueryBuilder() {
       <div className="qb-nav">
         <button className="qb-nav-btn" onClick={() => navigate('/')}>← Back to Games</button>
       </div>
+      {games.length > 0 && (
+        <div style={{ padding: '0 16px', marginBottom: '8px' }}>
+          <div style={{ color: '#64748b', fontSize: '11px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Today's Games</div>
+          <GameStrip games={games} signals={signals} />
+        </div>
+      )}
+
       <div className="qb-container">
         <h2 className="qb-title">Query Builder</h2>
         <p className="qb-subtitle">Define conditions and see how teams have historically performed</p>
