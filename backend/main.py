@@ -1091,6 +1091,18 @@ async def query_historical(
     win_pct = round(wins / n, 3)
     dev = round(deviation_score(wins, n), 3)
 
+    recent = df.sort_values("game_date_et", ascending=False).head(10)
+    sample_games = []
+    for _, row in recent.iterrows():
+        sample_games.append({
+            "game_date": str(row["game_date_et"])[:10],
+            "team": row["team_abbr"],
+            "opponent": row.get("opponent_abbr", ""),
+            "is_home": bool(row["is_home"]),
+            "team_won": bool(row["team_won"]),
+            "moneyline": float(row["h2h_own_odds"]) if row.get("h2h_own_odds") is not None and str(row.get("h2h_own_odds")) not in ("nan", "inf", "-inf") else None,
+        })
+
     return {
         "wins": wins,
         "losses": losses,
@@ -1098,6 +1110,7 @@ async def query_historical(
         "win_pct": win_pct,
         "deviation": dev,
         "sample_warning": n < 15,
+        "sample_games": sample_games,
     }
 
 

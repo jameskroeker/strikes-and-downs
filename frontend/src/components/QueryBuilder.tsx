@@ -472,6 +472,38 @@ export function QueryBuilder() {
                 {result.sample_warning && (
                   <p className="qb-warning">⚠️ Small sample size — interpret with caution</p>
                 )}
+                {result.sample_games && result.sample_games.length > 0 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Recent Matching Games</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 12px', fontSize: '11px', color: '#475569', marginBottom: '2px' }}>
+                        <span style={{ minWidth: '85px' }}>Date</span>
+                        <span style={{ minWidth: '40px' }}>Team</span>
+                        <span>Matchup</span>
+                        <span style={{ minWidth: '45px', textAlign: 'right' }}>ML</span>
+                        <span style={{ minWidth: '20px', textAlign: 'right' }}>Result</span>
+                      </div>
+                      {result.sample_games.map((g: any, i: number) => (
+                        <div key={i} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          background: '#1a1f2e', borderRadius: '6px', padding: '6px 12px',
+                          fontSize: '12px', color: '#94a3b8',
+                          borderLeft: g.team_won ? '3px solid #4caf50' : '3px solid #ef4444',
+                        }}>
+                          <span style={{ color: '#64748b', minWidth: '85px' }}>{g.game_date}</span>
+                          <span style={{ fontWeight: 'bold', minWidth: '40px' }}>{g.team}</span>
+                          <span style={{ color: '#64748b' }}>{g.is_home ? 'vs' : '@'} {g.opponent}</span>
+                          <span style={{ minWidth: '45px', textAlign: 'right', color: '#64748b' }}>
+                            {g.moneyline ? (g.moneyline >= 2.0 ? '+' + Math.round((g.moneyline - 1) * 100) : String(Math.round(-(100 / (g.moneyline - 1))))) : '-'}
+                          </span>
+                          <span style={{ fontWeight: 'bold', color: g.team_won ? '#4caf50' : '#ef4444', minWidth: '20px', textAlign: 'right' }}>
+                            {g.team_won ? 'W' : 'L'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
