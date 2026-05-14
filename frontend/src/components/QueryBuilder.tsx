@@ -540,6 +540,38 @@ export function QueryBuilder() {
                 {result.sample_warning && (
                   <p className="qb-warning">⚠️ Small sample size — interpret with caution</p>
                 )}
+                {result.sample_games && result.sample_games.length > 0 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Recent Matching Games</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 12px', fontSize: '11px', color: '#475569', marginBottom: '2px' }}>
+                        <span style={{ minWidth: '85px' }}>Date</span>
+                        <span style={{ minWidth: '40px' }}>Team</span>
+                        <span style={{ flex: 1 }}>Matchup</span>
+                        <span style={{ minWidth: '50px', textAlign: 'right' }}>Total</span>
+                        <span style={{ minWidth: '40px', textAlign: 'right' }}>Runs</span>
+                        <span style={{ minWidth: '30px', textAlign: 'right' }}>O/U</span>
+                      </div>
+                      {result.sample_games.map((g: any, i: number) => (
+                        <div key={i} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          background: '#1a1f2e', borderRadius: '6px', padding: '6px 12px',
+                          fontSize: '12px', color: '#94a3b8',
+                          borderLeft: g.result === 'Over' ? '3px solid #4caf50' : g.result === 'Under' ? '3px solid #ef4444' : '3px solid #64748b',
+                        }}>
+                          <span style={{ color: '#64748b', minWidth: '85px' }}>{g.game_date}</span>
+                          <span style={{ fontWeight: 'bold', minWidth: '40px' }}>{g.team}</span>
+                          <span style={{ color: '#64748b', flex: 1 }}>{g.is_home ? 'vs' : '@'} {g.opponent}</span>
+                          <span style={{ minWidth: '50px', textAlign: 'right', color: '#64748b' }}>{g.total_line ?? '-'}</span>
+                          <span style={{ minWidth: '40px', textAlign: 'right', color: '#64748b' }}>{g.total_runs ?? '-'}</span>
+                          <span style={{ fontWeight: 'bold', minWidth: '30px', textAlign: 'right', color: g.result === 'Over' ? '#4caf50' : g.result === 'Under' ? '#ef4444' : '#64748b' }}>
+                            {g.result === 'Over' ? 'O' : g.result === 'Under' ? 'U' : 'P'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>

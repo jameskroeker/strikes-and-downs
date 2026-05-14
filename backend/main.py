@@ -993,6 +993,27 @@ async def query_ou(
     push = int((home_df["_total_result"] == "Push").sum())
     decided = over + under
 
+    recent = home_df.sort_values("game_date_et", ascending=False).head(10)
+    sample_games = []
+    for _, row in recent.iterrows():
+        ml = row.get("h2h_own_odds")
+        ml_clean = float(ml) if ml is not None and str(ml) not in ("nan", "inf", "-inf") else None
+        total_runs = None
+        if row.get("home_score") is not None and row.get("away_score") is not None:
+            try:
+                total_runs = float(row["home_score"]) + float(row["away_score"])
+            except Exception:
+                pass
+        sample_games.append({
+            "game_date": str(row["game_date_et"])[:10],
+            "team": row["team_abbr"],
+            "opponent": row.get("opponent_abbr", ""),
+            "is_home": bool(row["is_home"]),
+            "total_line": float(row["Total"]) if row.get("Total") is not None and str(row.get("Total")) not in ("nan", "inf", "-inf") else None,
+            "total_runs": total_runs,
+            "result": row.get("_total_result"),
+        })
+
     return {
         "over": over,
         "under": under,
@@ -1001,6 +1022,7 @@ async def query_ou(
         "over_pct": round(over / decided, 3) if decided > 0 else None,
         "under_pct": round(under / decided, 3) if decided > 0 else None,
         "sample_warning": n < 20,
+        "sample_games": sample_games,
     }
 
 @app.get("/api/query")
