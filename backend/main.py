@@ -1170,6 +1170,199 @@ async def get_signal_accuracy():
     _accuracy_cache["accuracy"] = (result, time.monotonic())
     return result
 
+@app.get("/api/signals/{game_date}/simulate")
+async def simulate_signals(game_date: str, sim_team: str = "", sim_bucket: str = ""):
+    """Simulate signal scoring with an overridden bucket for one team.
+    Returns each game with latent_signal and signal_at_risk flags."""
+
+    daily_df, master_df = await asyncio.gather(
+        fetch_daily_csv(game_date),
+        fetch_master_df(),
+    )
+    season = int(game_date[:4])
+    hist_df = master_df[master_df["season"] < season].copy()
+    if daily_df is None or daily_df.empty:
+        return {"date": game_date, "sim_team": sim_team, "sim_bucket": sim_bucket, "signals": []}
+
+    # Get baseline signals (cached)
+    baseline = await get_date_signals(game_date)
+    baseline_by_id = {g["game_id"]: g for g in baseline["signals"]}
+
+    today_games = daily_df.drop_duplicates(subset=["game_id"])
+    results = []
+
+    def dimension_multiplier(filters: dict) -> float:
+        has_odds = "odds_bucket" in filters
+        has_team = "team_bucket" in filters
+        has_opp = "opp_bucket" in filters
+        count = sum([has_odds, has_team, has_opp])
+        if count == 3: return 1.5
+        elif count == 2: return 1.0
+        else: return 0.75
+
+    def score_patterns(patterns: list, implied_prob: float) -> tuple:
+        total_score = 0.0
+        best = None
+        best_score = 0.0
+        for result in patterns:
+            if result["n"] < 15 or result["deviation"] < 0.15:
+                continue
+            if implied_prob:
+                result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
+                result["implied_prob"] = implied_prob
+            score = result["deviation"] * dimension_multiplier(result.get("filters", {}))
+            direction = 1.0 if result["win_pct"] > 0.50 else -1.0
+            total_score += score * direction
+            if score > best_score:
+                best_score = score
+                best = result
+        return total_score, best
+
+    def build_filters(is_home, odds_bkt, team_bkt, opp_bkt, streak_bkt, l10_bkt, gc_bkt):
+        base = [
+            {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt},
+            {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "game_count_bucket": gc_bkt},
+            {"is_home": is_home, "odds_bucket": odds_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
+            {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
+            {"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "streak_bucket": streak_bkt},
+            {"is_home": is_home, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "game_count_bucket": gc_bkt},
+            {"is_home": is_home, "team_bucket": team_bkt, "opp_bucket": opp_bkt},
+        ]
+        if l10_bkt:
+            base.append({"is_home": is_home, "odds_bucket": odds_bkt, "team_bucket": team_bkt, "opp_bucket": opp_bkt, "l10_bucket": l10_bkt})
+        cleaned = [{k: v for k, v in f.items() if v is not None} for f in base]
+        return [f for f in cleaned if len(f) >= 3]
+
+    for _, row in today_games.iterrows():
+        game_id = str(row["game_id"])
+        home_abbr = TEAM_NAME_TO_ABBR.get(str(row["home_team"]), str(row["home_team"]))
+        away_abbr = TEAM_NAME_TO_ABBR.get(str(row["away_team"]), str(row["away_team"]))
+
+        # Skip games that don't involve the sim team
+        if sim_team and sim_team not in (home_abbr, away_abbr):
+            continue
+
+        current_season_home = master_df[(master_df["team_abbr"] == home_abbr) & (master_df["season"] == season)]
+        current_season_away = master_df[(master_df["team_abbr"] == away_abbr) & (master_df["season"] == season)]
+
+        home_stats = get_team_stats(master_df, home_abbr, season)
+        away_stats = get_team_stats(master_df, away_abbr, season)
+
+        # Apply bucket override
+        home_bucket = sim_bucket if (sim_team == home_abbr and sim_bucket) else win_pct_bucket(home_stats["win_pct"])
+        away_bucket = sim_bucket if (sim_team == away_abbr and sim_bucket) else win_pct_bucket(away_stats["win_pct"])
+
+        home_ml = row.get("moneyline_home")
+        away_ml = row.get("moneyline_away")
+        home_implied = round(1 / home_ml, 3) if home_ml and home_ml > 0 else None
+        away_implied = round(1 / away_ml, 3) if away_ml and away_ml > 0 else None
+        home_odds_bucket = odds_bucket(home_ml) if home_ml else None
+        away_odds_bucket = odds_bucket(away_ml) if away_ml else None
+
+        home_latest = current_season_home.iloc[-1] if not current_season_home.empty else None
+        away_latest = current_season_away.iloc[-1] if not current_season_away.empty else None
+
+        home_win_streak = int(home_latest["Win_Streak"] or 0) if home_latest is not None else 0
+        home_loss_streak = int(home_latest["Loss_Streak"] or 0) if home_latest is not None else 0
+        away_win_streak = int(away_latest["Win_Streak"] or 0) if away_latest is not None else 0
+        away_loss_streak = int(away_latest["Loss_Streak"] or 0) if away_latest is not None else 0
+
+        home_streak_bkt = streak_bucket(home_win_streak, home_loss_streak)
+        away_streak_bkt = streak_bucket(away_win_streak, away_loss_streak)
+
+        home_l10 = int(current_season_home.tail(10)["team_won"].sum())
+        away_l10 = int(current_season_away.tail(10)["team_won"].sum())
+        home_l10_bkt = last_10_bucket(home_l10) if len(current_season_home) >= 10 else None
+        away_l10_bkt = last_10_bucket(away_l10) if len(current_season_away) >= 10 else None
+
+        games_played_home = len(current_season_home)
+        games_played_away = len(current_season_away)
+        home_gc_bucket = game_count_bucket(games_played_home)
+        away_gc_bucket = game_count_bucket(games_played_away)
+
+        home_hist = hist_df[hist_df["team_abbr"] == home_abbr].copy()
+        away_hist = hist_df[hist_df["team_abbr"] == away_abbr].copy()
+
+        home_filters = build_filters(True, home_odds_bucket, home_bucket, away_bucket, home_streak_bkt, home_l10_bkt, home_gc_bucket)
+        home_patterns = []
+        for f in home_filters:
+            r = query_situation(home_hist, f)
+            if r: r["filters"] = f; r["source"] = "team"; home_patterns.append(r)
+            r2 = query_league_situation(hist_df, f, exclude_abbr=home_abbr)
+            if r2: r2["filters"] = f; r2["source"] = "league"; home_patterns.append(r2)
+
+        away_filters = build_filters(False, away_odds_bucket, away_bucket, home_bucket, away_streak_bkt, away_l10_bkt, away_gc_bucket)
+        away_patterns = []
+        for f in away_filters:
+            r = query_situation(away_hist, f)
+            if r: r["filters"] = f; r["source"] = "team"; away_patterns.append(r)
+            r2 = query_league_situation(hist_df, f, exclude_abbr=away_abbr)
+            if r2: r2["filters"] = f; r2["source"] = "league"; away_patterns.append(r2)
+
+        if (home_odds_bucket and home_odds_bucket == "heavy_favorite") or (away_odds_bucket and away_odds_bucket == "heavy_favorite"):
+            continue
+
+        home_score, home_best = score_patterns(home_patterns, home_implied)
+        away_score, away_best = score_patterns(away_patterns, away_implied)
+        consensus_score = round(home_score - away_score, 3)
+        abs_consensus = abs(consensus_score)
+
+        if abs_consensus >= 1.0:
+            sim_tier = 1
+            sim_signal_team = home_abbr if consensus_score > 0 else away_abbr
+        else:
+            sim_tier = 0
+            sim_signal_team = None
+
+        # Pythagorean boost
+        if sim_tier == 0 and abs_consensus >= 0.75:
+            candidate_stats = home_stats if consensus_score > 0 else away_stats
+            opp_candidate_stats = away_stats if consensus_score > 0 else home_stats
+            candidate_actual = candidate_stats.get("win_pct", 0.0)
+            candidate_pyth = candidate_stats.get("pyth_win_pct")
+            opp_actual = opp_candidate_stats.get("win_pct", 0.0)
+            opp_pyth = opp_candidate_stats.get("pyth_win_pct")
+            boost = False
+            if candidate_pyth is not None and round(candidate_pyth - candidate_actual, 3) >= 0.05:
+                boost = True
+            if opp_pyth is not None and round(opp_actual - opp_pyth, 3) >= 0.05:
+                boost = True
+            if boost:
+                sim_tier = 1
+                sim_signal_team = home_abbr if consensus_score > 0 else away_abbr
+
+        baseline_game = baseline_by_id.get(game_id, {})
+        baseline_tier = baseline_game.get("tier", 0)
+
+        latent_signal = baseline_tier == 0 and sim_tier == 1
+        signal_at_risk = baseline_tier == 1 and sim_tier == 0
+
+        if latent_signal or signal_at_risk:
+            results.append({
+                "game_id": game_id,
+                "home_team": home_abbr,
+                "away_team": away_abbr,
+                "baseline_tier": baseline_tier,
+                "baseline_score": baseline_game.get("consensus_score", 0.0),
+                "sim_tier": sim_tier,
+                "sim_score": consensus_score,
+                "sim_signal_team": sim_signal_team,
+                "latent_signal": latent_signal,
+                "signal_at_risk": signal_at_risk,
+                "sim_team": sim_team,
+                "sim_bucket": sim_bucket,
+            })
+
+    return {
+        "date": game_date,
+        "sim_team": sim_team,
+        "sim_bucket": sim_bucket,
+        "latent_signals": sum(1 for r in results if r["latent_signal"]),
+        "signals_at_risk": sum(1 for r in results if r["signal_at_risk"]),
+        "games": results,
+    }
+
+
 @app.get("/api/signals/{game_date}")
 async def get_date_signals(game_date: str):
     """Consensus-based signal engine. Scores each game by how strongly both teams'

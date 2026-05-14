@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchGamesForDate, fetchSignalsForDate } from '../api'
 import type { Game } from '../types'
@@ -96,8 +96,23 @@ function getTodayET(): string {
 }
 
 function GameStrip({ games, signals }: { games: Game[], signals: Record<string, any> }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const scroll = (dir: number) => scrollRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' })
   return (
-    <div style={{ overflowX: 'auto', paddingBottom: '8px', marginBottom: '24px' }}>
+    <div style={{ position: 'relative' }}>
+      <button onClick={() => scroll(-1)} style={{
+        position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+        zIndex: 2, background: 'rgba(15,20,30,0.85)', border: '1px solid #2a2f3e',
+        borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer',
+        color: '#94a3b8', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>‹</button>
+      <button onClick={() => scroll(1)} style={{
+        position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
+        zIndex: 2, background: 'rgba(15,20,30,0.85)', border: '1px solid #2a2f3e',
+        borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer',
+        color: '#94a3b8', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>›</button>
+    <div ref={scrollRef} style={{ overflowX: 'auto', paddingBottom: '8px', marginBottom: '24px', scrollbarWidth: 'none', paddingLeft: '36px', paddingRight: '36px' }}>
       <div style={{ display: 'flex', gap: '10px', minWidth: 'max-content', padding: '4px 2px' }}>
         {games.map(game => {
           const sig = signals[game.game_id]
@@ -140,6 +155,7 @@ function GameStrip({ games, signals }: { games: Game[], signals: Record<string, 
           )
         })}
       </div>
+    </div>
     </div>
   )
 }
