@@ -31,9 +31,9 @@ const TEAM_BUCKETS = [
 const GAME_COUNT_BUCKETS = [
   { value: '', label: 'Any' },
   { value: 'early', label: 'Early Season (G1-20)' },
-  { value: 'mid_early', label: 'Mid-Early (G21-60)' },
+  { value: 'mid-early', label: 'Mid-Early (G21-60)' },
   { value: 'mid', label: 'Mid Season (G61-100)' },
-  { value: 'mid_late', label: 'Mid-Late (G101-130)' },
+  { value: 'mid-late', label: 'Mid-Late (G101-130)' },
   { value: 'late', label: 'Late Season (G131-162)' },
 ]
 
