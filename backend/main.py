@@ -1092,15 +1092,19 @@ async def query_historical(
         df = df[mask] if division_game.lower() == "true" else df[~mask]
 
     if interleague is not None:
-        game_opp = hist_df.groupby("game_id")["team_abbr"].apply(list).to_dict()
-        def check_interleague(row):
-            teams = game_opp.get(row["game_id"], [])
-            opp = [t for t in teams if t != row["team_abbr"]]
-            if not opp:
-                return False
-            return TEAM_LEAGUE.get(row["team_abbr"]) != TEAM_LEAGUE.get(opp[0])
-        mask = df.apply(check_interleague, axis=1)
-        df = df[mask] if interleague.lower() == "true" else df[~mask]
+        try:
+            game_opp = hist_df.groupby("game_id")["team_abbr"].apply(list).to_dict()
+            def check_interleague(row):
+                teams = game_opp.get(row["game_id"], [])
+                opp = [t for t in teams if t != row["team_abbr"]]
+                if not opp:
+                    return False
+                return TEAM_LEAGUE.get(row["team_abbr"]) != TEAM_LEAGUE.get(opp[0])
+            if not df.empty:
+                mask = df.apply(check_interleague, axis=1)
+                df = df[mask] if interleague.lower() == "true" else df[~mask]
+        except Exception:
+            pass
 
     df = df[df["team_won"].notna()]
     n = len(df)
