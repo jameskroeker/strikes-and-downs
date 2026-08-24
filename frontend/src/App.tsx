@@ -124,6 +124,19 @@ function App() {
         <Route path="/query" element={<QueryBuilder />} />
         <Route path="/methodology" element={<Methodology />} />
       </Routes>
+      <footer style={{
+        textAlign: 'center',
+        padding: '16px',
+        fontSize: '12px',
+        color: '#64748b',
+        borderTop: '1px solid #1e293b',
+        marginTop: '32px'
+      }}>
+        Questions or feedback?{' '}
+        <a href="mailto:strikesanddown@gmail.com" style={{ color: '#3a9e6a', textDecoration: 'none' }}>
+          strikesanddown@gmail.com
+        </a>
+      </footer>
     </BrowserRouter>
   )
 }
