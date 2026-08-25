@@ -397,8 +397,8 @@ async def get_games_for_date(game_date: str):
         away_abbr = TEAM_NAME_TO_ABBR.get(away_name, away_name[:3].upper())
 
         season = int(game_date[:4])
-        home_stats = get_team_stats(master_df, home_abbr, season)
-        away_stats = get_team_stats(master_df, away_abbr, season)
+        home_stats = get_team_stats(master_df, home_abbr, season, as_of_date=game_date)
+        away_stats = get_team_stats(master_df, away_abbr, season, as_of_date=game_date)
 
         ml_home = safe_float(row.get("moneyline_home"))
         ml_away = safe_float(row.get("moneyline_away"))
