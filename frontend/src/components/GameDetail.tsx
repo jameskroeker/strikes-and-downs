@@ -86,10 +86,14 @@ function WinBar({ win_pct, implied_prob }: { win_pct: number, implied_prob: numb
       <div style={{ flex: 1, height: '8px', background: '#2a2f3e', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '4px' }} />
         {implied_prob && (
-          <div style={{
-            position: 'absolute', top: '-2px', left: `${Math.round(implied_prob * 100)}%`,
-            width: '2px', height: '12px', background: '#666', borderRadius: '1px'
-          }} />
+          <div
+            title={`Market implies ${Math.round(implied_prob * 100)}% win probability`}
+            style={{
+              position: 'absolute', top: '-2px', left: `${Math.round(implied_prob * 100)}%`,
+              width: '2px', height: '12px', background: '#94a3b8', borderRadius: '1px',
+              cursor: 'help'
+            }}
+          />
         )}
       </div>
       <span style={{ color, fontWeight: 'bold', minWidth: '36px', fontSize: '13px' }}>{pct}%</span>
