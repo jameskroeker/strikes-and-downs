@@ -80,23 +80,30 @@ interface SituationsResponse {
 
 function WinBar({ win_pct, implied_prob }: { win_pct: number, implied_prob: number | null }) {
   const pct = Math.round(win_pct * 100)
+  const impliedPct = implied_prob ? Math.round(implied_prob * 100) : null
   const color = pct >= 60 ? '#4caf50' : pct <= 40 ? '#f44336' : '#888'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <div style={{ flex: 1, height: '8px', background: '#2a2f3e', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '4px' }} />
-        {implied_prob && (
-          <div
-            title={`Market implies ${Math.round(implied_prob * 100)}% win probability`}
-            style={{
-              position: 'absolute', top: '-2px', left: `${Math.round(implied_prob * 100)}%`,
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ flex: 1, height: '8px', background: '#2a2f3e', borderRadius: '4px', overflow: 'visible', position: 'relative' }}>
+          <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '4px' }} />
+          {implied_prob && (
+            <div style={{
+              position: 'absolute', top: '-2px', left: `${impliedPct}%`,
               width: '2px', height: '12px', background: '#94a3b8', borderRadius: '1px',
-              cursor: 'help'
-            }}
-          />
-        )}
+            }} />
+          )}
+        </div>
+        <span style={{ color, fontWeight: 'bold', minWidth: '36px', fontSize: '13px' }}>{pct}%</span>
       </div>
-      <span style={{ color, fontWeight: 'bold', minWidth: '36px', fontSize: '13px' }}>{pct}%</span>
+      {impliedPct && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '0px' }}>
+          <div style={{ width: `${impliedPct}%`, borderBottom: 'none' }} />
+          <span style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap' }}>
+            ▲ market: {impliedPct}%
+          </span>
+        </div>
+      )}
     </div>
   )
 }
