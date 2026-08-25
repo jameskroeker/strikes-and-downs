@@ -118,6 +118,17 @@ function GamesList() {
 function App() {
   return (
     <BrowserRouter>
+      <div style={{
+        backgroundColor: '#1a2e20',
+        borderBottom: '1px solid #3a9e6a',
+        padding: '8px 16px',
+        textAlign: 'center',
+        fontSize: '12px',
+        color: '#6aab88',
+        letterSpacing: '0.3px'
+      }}>
+        🚧 Strikes & Downs is in beta. Odds data may be incomplete for some games, particularly late West Coast starts. Data improves throughout the day.
+      </div>
       <Routes>
         <Route path="/" element={<GamesList />} />
         <Route path="/game/:gameId" element={<GameDetail />} />
