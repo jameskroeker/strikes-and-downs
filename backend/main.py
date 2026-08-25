@@ -240,8 +240,8 @@ def format_time_et(val) -> str:
         return "TBD"
 
 
-def get_team_stats(master_df: pd.DataFrame, team_abbr: str, season: int) -> dict:
-    """Return the most recent stats for a team filtered to the given season."""
+def get_team_stats(master_df: pd.DataFrame, team_abbr: str, season: int, as_of_date: str = None) -> dict:
+    """Return team stats as of a specific date (or latest if no date given)."""
     team_data = master_df[
         (master_df["team_abbr"] == team_abbr) & (master_df["season"] == season)
     ].copy()
@@ -250,6 +250,13 @@ def get_team_stats(master_df: pd.DataFrame, team_abbr: str, season: int) -> dict
 
     team_data["game_date_et"] = pd.to_datetime(team_data["game_date_et"], errors="coerce")
     sorted_data = team_data.sort_values("game_date_et")
+
+    # If a game date is provided, use the record as of that date (not today's live record)
+    if as_of_date:
+        as_of = pd.to_datetime(as_of_date)
+        prior = sorted_data[sorted_data["game_date_et"] <= as_of]
+        sorted_data = prior if not prior.empty else sorted_data
+
     latest = sorted_data.iloc[-1]
 
     win_streak = int(latest.get("Win_Streak") or 0)
@@ -733,8 +740,8 @@ async def get_game_situations(game_id: str, game_date: str):
             results[abbr] = {"team_situations": [], "league_situations": []}
             continue
 
-        # Get current season stats for bucketing
-        season_stats = get_team_stats(master_df, abbr, season)
+        # Get current season stats for bucketing — as of the game date for historical accuracy
+        season_stats = get_team_stats(master_df, abbr, season, as_of_date=game_date)
         team_bucket = win_pct_bucket(season_stats["win_pct"])
 
         # Calculate last 10 for historical rows per game (rolling)
@@ -753,7 +760,7 @@ async def get_game_situations(game_id: str, game_date: str):
         current_l10_bucket = last_10_bucket(current_l10_wins) if len(current_season_df) >= 10 else None
 
         # Current team's opp bucket
-        opp_stats = get_team_stats(master_df, away_abbr if is_home else home_abbr, season)
+        opp_stats = get_team_stats(master_df, away_abbr if is_home else home_abbr, season, as_of_date=game_date)
         opp_bucket = win_pct_bucket(opp_stats["win_pct"])
 
         # Define situations to test — from broadest to most specific
