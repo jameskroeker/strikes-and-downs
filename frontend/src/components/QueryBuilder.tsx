@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchGamesForDate, fetchSignalsForDate } from '../api'
 import type { Game } from '../types'
 import { TEAM_COLORS } from '../teamColors'
@@ -69,7 +69,37 @@ const TEAMS = [
   'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSH'
 ]
 
+// Suggested starting queries to guide first-time users
+const SUGGESTED_QUERIES = [
+  {
+    label: 'Home favorites, hot streak',
+    description: 'Good teams at home on a win streak as favorites',
+    filters: { is_home: 'true', odds_bucket: 'favorite', team_bucket: 'good', streak_direction: 'W', streak_entering: '3' },
+  },
+  {
+    label: 'Underdogs bouncing back',
+    description: 'Average teams as underdogs after a losing streak',
+    filters: { is_home: '', odds_bucket: 'clear_underdog', team_bucket: 'average', streak_direction: 'L', streak_entering: '3' },
+  },
+  {
+    label: 'Elite teams vs struggling opponents',
+    description: 'Elite teams facing poor opponents, mid-season',
+    filters: { team_bucket: 'elite', opp_bucket: 'bad', game_count_bucket: 'mid' },
+  },
+  {
+    label: 'Post All-Star road dogs',
+    description: 'Good teams on the road as underdogs in the second half',
+    filters: { is_home: 'false', odds_bucket: 'slight_underdog', team_bucket: 'good', game_count_bucket: 'mid-late' },
+  },
+]
+
 const API_BASE = import.meta.env.VITE_API_URL || 'https://strikes-and-downs.onrender.com'
+
+const EMPTY_FILTERS = {
+  team_abbr: '', is_home: '', odds_bucket: '', team_bucket: '',
+  opp_bucket: '', game_count_bucket: '', streak_direction: '',
+  streak_entering: '', rest: '', division_game: '', interleague: '',
+}
 
 function deviationColor(dev: number): string {
   if (dev >= 0.25) return '#4caf50'
@@ -162,9 +192,11 @@ function GameStrip({ games, signals }: { games: Game[], signals: Record<string, 
 
 export function QueryBuilder() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [mode, setMode] = useState<'sides' | 'ou'>('sides')
   const [games, setGames] = useState<Game[]>([])
   const [signals, setSignals] = useState<Record<string, any>>({})
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     const today = getTodayET()
@@ -172,10 +204,14 @@ export function QueryBuilder() {
     fetchSignalsForDate(today).then(s => setSignals(s)).catch(() => {})
   }, [])
 
-  const [filters, setFilters] = useState({
-    team_abbr: '', is_home: '', odds_bucket: '', team_bucket: '',
-    opp_bucket: '', game_count_bucket: '', streak_direction: '',
-    streak_entering: '', rest: '', division_game: '', interleague: '',
+  // Initialize filters from URL params
+  const [filters, setFilters] = useState(() => {
+    const f = { ...EMPTY_FILTERS }
+    Object.keys(f).forEach(k => {
+      const v = searchParams.get(k)
+      if (v) (f as any)[k] = v
+    })
+    return f
   })
 
   const [ouFilters, setOuFilters] = useState({
@@ -196,17 +232,48 @@ export function QueryBuilder() {
     setOuFilters(f => ({ ...f, [key]: value }))
   }
 
+  function loadSuggestion(suggested: Record<string, string>) {
+    setFilters({ ...EMPTY_FILTERS, ...suggested })
+    setResult(null)
+    setError(null)
+  }
+
+  function copyShareLink() {
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([k, v]) => { if (v !== '') params.append(k, v) })
+    const url = `${window.location.origin}/query?${params.toString()}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
   async function runQuery() {
     setLoading(true)
     setError(null)
     setResult(null)
+
+    // Sync filters to URL
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([k, v]) => { if (v !== '') params.append(k, v) })
+    setSearchParams(params)
+
     try {
       if (mode === 'sides') {
-        const params = new URLSearchParams()
-        Object.entries(filters).forEach(([k, v]) => { if (v !== '') params.append(k, v) })
         const res = await fetch(`${API_BASE}/api/query?${params.toString()}`)
         const data = await res.json()
-        setResult({ mode: 'sides', ...data })
+
+        // Also fetch 2026 season record for this situation
+        const params2026 = new URLSearchParams(params)
+        params2026.append('season', '2026')
+        let season2026 = null
+        try {
+          const res2026 = await fetch(`${API_BASE}/api/query?${params2026.toString()}`)
+          const d2026 = await res2026.json()
+          if (!d2026.message) season2026 = d2026
+        } catch {}
+
+        setResult({ mode: 'sides', ...data, season2026 })
       } else {
         const params = new URLSearchParams()
         Object.entries(ouFilters).forEach(([k, v]) => { if (v !== '') params.append(k, v) })
@@ -222,15 +289,21 @@ export function QueryBuilder() {
   }
 
   function resetFilters() {
-    setFilters({ team_abbr: '', is_home: '', odds_bucket: '', team_bucket: '',
-      opp_bucket: '', game_count_bucket: '', streak_direction: '',
-      streak_entering: '', rest: '', division_game: '', interleague: '' })
-    setOuFilters({ team_abbr: '', is_home: '', total_bucket: '', home_l10_scored: '',
+    setFilters(EMPTY_FILTERS)
+    setOuFilters({
+      team_abbr: '', is_home: '', total_bucket: '', home_l10_scored: '',
       away_l10_scored: '', team_bucket: '', opp_bucket: '', division_game: '',
-      streak_direction: '', streak_entering: '' })
+      streak_direction: '', streak_entering: '',
+    })
     setResult(null)
     setError(null)
+    setSearchParams({})
   }
+
+  const hasEdge = result && result.mode === 'sides' && !result.message &&
+    result.win_pct != null && result.win_pct >= 0.58 &&
+    result.deviation != null && result.deviation >= 0.15 &&
+    result.n >= 20
 
   return (
     <div className="app">
@@ -250,6 +323,30 @@ export function QueryBuilder() {
       <div className="qb-container">
         <h2 className="qb-title">Query Builder</h2>
         <p className="qb-subtitle">Define conditions and see how teams have historically performed</p>
+
+        {/* Suggested queries */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Start with a pattern</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {SUGGESTED_QUERIES.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => loadSuggestion(s.filters)}
+                title={s.description}
+                style={{
+                  background: '#1a1f2e', border: '1px solid #2a2f3e',
+                  borderRadius: '6px', padding: '6px 12px',
+                  color: '#93c5fd', fontSize: '12px', cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#93c5fd')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#2a2f3e')}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
           <button
@@ -437,20 +534,47 @@ export function QueryBuilder() {
             {loading ? 'Running...' : 'Run Query'}
           </button>
           <button className="qb-btn-secondary" onClick={resetFilters}>Reset</button>
+          {result && mode === 'sides' && (
+            <button
+              onClick={copyShareLink}
+              style={{
+                background: copied ? 'rgba(74,222,128,0.12)' : 'none',
+                border: `1px solid ${copied ? '#4ade80' : '#2a2f3e'}`,
+                color: copied ? '#4ade80' : '#64748b',
+                padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
+              }}
+            >
+              {copied ? '✓ Copied' : '🔗 Share'}
+            </button>
+          )}
         </div>
 
         {error && <div className="qb-error">{error}</div>}
 
         {result && result.mode === 'sides' && (
-          <div className="qb-result">
+          <div className="qb-result" style={{
+            border: hasEdge ? '1px solid #4caf50' : '1px solid #2a2f3e',
+            borderRadius: '10px', padding: '16px',
+            background: hasEdge ? 'rgba(76,175,80,0.04)' : 'transparent',
+          }}>
             {result.message ? (
               <p className="qb-no-results">{result.message}</p>
             ) : (
               <>
+                {hasEdge && (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    background: 'rgba(76,175,80,0.12)', border: '1px solid #4caf50',
+                    borderRadius: '6px', padding: '4px 10px', marginBottom: '12px',
+                    fontSize: '11px', fontWeight: 'bold', color: '#4caf50', letterSpacing: '0.06em'
+                  }}>
+                    ⚡ STRONG PATTERN — above historical baseline
+                  </div>
+                )}
                 <div className="qb-result-main">
                   <div className="qb-stat">
                     <span className="qb-stat-value">{result.wins}-{result.losses}</span>
-                    <span className="qb-stat-label">Record</span>
+                    <span className="qb-stat-label">All-Time Record</span>
                   </div>
                   <div className="qb-stat">
                     <span className="qb-stat-value" style={{ color: deviationColor(result.deviation ?? 0) }}>
@@ -468,7 +592,45 @@ export function QueryBuilder() {
                     </span>
                     <span className="qb-stat-label">Deviation</span>
                   </div>
+                  {result.implied_prob != null && (
+                    <div className="qb-stat">
+                      <span className="qb-stat-value" style={{
+                        color: result.value_gap != null && result.value_gap > 0 ? '#4caf50' : '#ef4444'
+                      }}>
+                        {result.implied_prob != null ? (result.implied_prob * 100).toFixed(1) + "%" : "—"}
+                      </span>
+                      <span className="qb-stat-label">Mkt Implied</span>
+                    </div>
+                  )}
+                  {result.value_gap != null && (
+                    <div className="qb-stat">
+                      <span className="qb-stat-value" style={{
+                        color: result.value_gap > 0 ? '#4caf50' : '#ef4444'
+                      }}>
+                        {result.value_gap > 0 ? '+' : ''}{(result.value_gap * 100).toFixed(1)}%
+                      </span>
+                      <span className="qb-stat-label">Value Gap</span>
+                    </div>
+                  )}
                 </div>
+
+                {/* 2026 season record */}
+                {result.season2026 && (
+                  <div style={{
+                    marginTop: '12px', padding: '8px 12px',
+                    background: '#1a1f2e', borderRadius: '6px',
+                    display: 'flex', alignItems: 'center', gap: '16px',
+                    fontSize: '12px', color: '#64748b'
+                  }}>
+                    <span style={{ fontWeight: 'bold', color: '#93c5fd', fontSize: '11px', letterSpacing: '0.05em' }}>2026 SEASON</span>
+                    <span style={{ color: '#e2e8f0' }}>{result.season2026.wins}-{result.season2026.losses}</span>
+                    <span style={{ color: deviationColor(result.season2026.deviation ?? 0) }}>
+                      {result.season2026.win_pct != null ? (result.season2026.win_pct * 100).toFixed(1) + "% win rate" : ""}
+                    </span>
+                    <span>n={result.season2026.n}</span>
+                  </div>
+                )}
+
                 {result.sample_warning && (
                   <p className="qb-warning">⚠️ Small sample size — interpret with caution</p>
                 )}
