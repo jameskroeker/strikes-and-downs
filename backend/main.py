@@ -1249,6 +1249,11 @@ async def simulate_signals(game_date: str, sim_team: str = "", sim_bucket: str =
             if implied_prob:
                 result["value_gap"] = round(result["win_pct"] - implied_prob, 3)
                 result["implied_prob"] = implied_prob
+                # Hard filter: only score situations where history beats the market.
+                # If the market already prices the team higher than history supports,
+                # there is no edge regardless of how strong the historical deviation is.
+                if result["value_gap"] <= 0:
+                    continue
             score = result["deviation"] * dimension_multiplier(result.get("filters", {}))
             direction = 1.0 if result["win_pct"] > 0.50 else -1.0
             total_score += score * direction
