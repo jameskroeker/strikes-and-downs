@@ -1045,11 +1045,17 @@ async def query_historical(
     division_game: Optional[str] = None,
     interleague: Optional[str] = None,
     team_abbr: Optional[str] = None,
+    season: Optional[int] = None,
 ):
     """Flexible historical query endpoint for the query builder page."""
     master_df = await fetch_master_df()
-    season = date.today().year
-    hist_df = master_df[master_df["season"] < season].copy()
+    current_season = date.today().year
+    # If a specific season is requested, filter to that season only
+    # Otherwise use all historical seasons (prior to current)
+    if season:
+        hist_df = master_df[master_df["season"] == season].copy()
+    else:
+        hist_df = master_df[master_df["season"] < current_season].copy()
 
     if hist_df.empty:
         return {"error": "No historical data available"}
