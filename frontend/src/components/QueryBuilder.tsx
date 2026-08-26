@@ -74,22 +74,22 @@ const SUGGESTED_QUERIES = [
   {
     label: 'Home favorites, hot streak',
     description: 'Good teams at home on a win streak as favorites',
-    filters: { is_home: 'true', odds_bucket: 'favorite', team_bucket: 'good', streak_direction: 'W', streak_entering: '3' },
+    filters: { is_home: 'true', odds_bucket: 'favorite', team_bucket: 'good', streak_direction: 'W', streak_entering: '3', opp_bucket: '', game_count_bucket: '', rest: '', division_game: '', interleague: '', team_abbr: '' },
   },
   {
     label: 'Underdogs bouncing back',
     description: 'Average teams as underdogs after a losing streak',
-    filters: { is_home: '', odds_bucket: 'clear_underdog', team_bucket: 'average', streak_direction: 'L', streak_entering: '3' },
+    filters: { is_home: '', odds_bucket: 'clear_underdog', team_bucket: 'average', streak_direction: 'L', streak_entering: '3', opp_bucket: '', game_count_bucket: '', rest: '', division_game: '', interleague: '', team_abbr: '' },
   },
   {
     label: 'Elite teams vs struggling opponents',
     description: 'Elite teams facing poor opponents, mid-season',
-    filters: { team_bucket: 'elite', opp_bucket: 'bad', game_count_bucket: 'mid' },
+    filters: { team_bucket: 'elite', opp_bucket: 'bad', game_count_bucket: 'mid', is_home: '', odds_bucket: '', streak_direction: '', streak_entering: '', rest: '', division_game: '', interleague: '', team_abbr: '' },
   },
   {
     label: 'Post All-Star road dogs',
     description: 'Good teams on the road as underdogs in the second half',
-    filters: { is_home: 'false', odds_bucket: 'slight_underdog', team_bucket: 'good', game_count_bucket: 'mid-late' },
+    filters: { is_home: 'false', odds_bucket: 'slight_underdog', team_bucket: 'good', game_count_bucket: 'mid-late', opp_bucket: '', streak_direction: '', streak_entering: '', rest: '', division_game: '', interleague: '', team_abbr: '' },
   },
 ]
 
