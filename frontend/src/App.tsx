@@ -132,13 +132,13 @@ function App() {
         borderTop: '1px solid #1e293b',
         marginTop: '32px'
       }}>
-        <div style={{ color: '#4a6355', marginBottom: '6px', fontSize: '11px' }}>
-          🚧 Strikes & Downs is in beta. Odds data may be incomplete for some games. Data improves throughout the day.
-        </div>
         Questions or feedback?{' '}
         <a href="mailto:strikesanddown@gmail.com" style={{ color: '#3a9e6a', textDecoration: 'none' }}>
           strikesanddown@gmail.com
         </a>
+        <div style={{ color: '#374151', marginTop: '6px', fontSize: '11px' }}>
+          🚧 Beta
+        </div>
       </footer>
     </BrowserRouter>
   )
