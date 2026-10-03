@@ -42,8 +42,13 @@ const HOME_AFTER_ROAD: Opt[] = [ANY, { value: '0', label: 'No' }, { value: '1', 
 const WINS: Opt[] = [ANY, ...Array.from({ length: 18 }, (_, i) => ({ value: String(i), label: `${i} win${i === 1 ? '' : 's'}` }))]
 const PCT_BANDS: Opt[] = [ANY, { value: 'lt400', label: 'Under .400' }, { value: '400-499', label: '.400–.499' },
   { value: '500', label: 'Exactly .500' }, { value: '501-599', label: '.501–.599' }, { value: '600plus', label: '.600+' }]
-const PREV_RESULT: Opt[] = [ANY, { value: 'blowout_win', label: 'Won by 17+' }, { value: 'win', label: 'Won by 1–16' },
-  { value: 'loss', label: 'Lost by 1–16' }, { value: 'blowout_loss', label: 'Lost by 17+' }]
+const PREV_RESULT: Opt[] = [ANY,
+  { value: 'any_win', label: 'Won (any margin)' },
+  { value: 'w1-3', label: 'Won by 1–3 (field goal)' }, { value: 'w4-8', label: 'Won by 4–8 (one score)' },
+  { value: 'w9-16', label: 'Won by 9–16 (two scores)' }, { value: 'w17', label: 'Won by 17+ (blowout)' },
+  { value: 'any_loss', label: 'Lost (any margin)' },
+  { value: 'l1-3', label: 'Lost by 1–3 (field goal)' }, { value: 'l4-8', label: 'Lost by 4–8 (one score)' },
+  { value: 'l9-16', label: 'Lost by 9–16 (two scores)' }, { value: 'l17', label: 'Lost by 17+ (blowout)' }]
 const PREV_ATS: Opt[] = [ANY, { value: 'covered', label: 'Covered' }, { value: 'missed', label: 'Did not cover' }]
 const PREV_UPSET: Opt[] = [ANY, { value: 'upset_win', label: 'Won as underdog' }, { value: 'upset_loss', label: 'Lost as favorite' }, { value: 'none', label: 'No upset' }]
 
@@ -63,7 +68,7 @@ const SUGGESTED: { label: string; description: string; filters: Partial<Filters>
   { label: 'Week 3: no ATS wins yet', description: 'Teams without a cover in their first two games', filters: { week: '3', ats_wins: '0' } },
   { label: 'Road favorites of 10+', description: 'Double-digit favorites away from home', filters: { home_away: 'away', spread_band: 'fav_10+' } },
   { label: 'Divisional road favorites of 0.5–2.5', description: 'Short road favorites in division games', filters: { divisional: 'true', home_away: 'away', spread_band: 'fav_0.5-2.5' } },
-  { label: 'Off a blowout win, now favored', description: 'Teams that won by 17+ last week', filters: { prev_result: 'blowout_win', side: 'fav' } },
+  { label: 'Off a blowout win, now favored', description: 'Teams that won by 17+ last week', filters: { prev_result: 'w17', side: 'fav' } },
 ]
 
 function pct(v: number | null | undefined): string {

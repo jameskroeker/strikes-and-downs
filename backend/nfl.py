@@ -104,7 +104,11 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     df["_win_pct"] = _pct_band(df["entering_win_pct"], su_games)
     df["_ats_pct"] = _pct_band(df["entering_ats_win_pct"], ats_games)
 
-    df["_prev_result"] = df["prev_result"].where(df["prev_result"] != "tie")
+    pm = df["prev_point_margin"]
+    df["_prev_result"] = pd.cut(
+        pm, [-999, -17, -9, -4, -1, 0, 3, 8, 16, 999],
+        labels=["l17", "l9-16", "l4-8", "l1-3", "tie", "w1-3", "w4-8", "w9-16", "w17"],
+    ).astype(object).where(pm != 0)
     df["_prev_ats"] = _tri(df["prev_spread_covered"], "covered", "missed")
     df["_prev_upset"] = df["prev_upset"]
     df["_prev_ot"] = _tri(df["prev_game_was_overtime"], "true", "false")
@@ -274,7 +278,11 @@ async def nfl_query(
     params = locals()
     for param, col in BUCKET_FILTERS.items():
         val = params.get(param)
-        if val:
+        if not val:
+            continue
+        if col in ("_prev_result", "_opp_prev_result") and val in ("any_win", "any_loss"):
+            df = df[df[col].astype(str).str.startswith("w" if val == "any_win" else "l")]
+        else:
             df = df[df[col] == val]
 
     summary = _summarize(df)
