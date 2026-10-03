@@ -19,6 +19,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from nfl import router as nfl_router  # NFL query builder (/api/nfl/*)
+
+app.include_router(nfl_router)
+
 PARQUET_URL = "https://raw.githubusercontent.com/jameskroeker/mlb-betting-data-pipeline/main/data/master/master_template.parquet"
 DAILY_CSV_URL = "https://raw.githubusercontent.com/jameskroeker/mlb-betting-data-pipeline/main/data/daily/MLB_Combined_Odds_Results_{date}.csv"
 ARCHIVE_CSV_URL = "https://raw.githubusercontent.com/jameskroeker/mlb-betting-data-pipeline/main/data/archive/MLB/2026/MLB_Combined_Odds_Results_{date}.csv"
