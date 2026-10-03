@@ -40,7 +40,8 @@ const REST: Opt[] = [ANY, { value: 'off_bye', label: 'Off a bye week' }, { value
 const ROAD: Opt[] = [ANY, { value: 'home', label: 'At home' }, { value: 'road1', label: '1st road game' }, { value: 'road2plus', label: '2nd+ straight road game' }]
 const HOME_AFTER_ROAD: Opt[] = [ANY, { value: '0', label: 'No' }, { value: '1', label: 'After 1 road game' }, { value: '2plus', label: 'After 2+ road games' }]
 const WINS: Opt[] = [ANY, ...Array.from({ length: 18 }, (_, i) => ({ value: String(i), label: `${i} win${i === 1 ? '' : 's'}` }))]
-const PCT_BANDS: Opt[] = [ANY, { value: 'lt400', label: 'Under .400' }, { value: '400-599', label: '.400–.599' }, { value: '600plus', label: '.600+' }]
+const PCT_BANDS: Opt[] = [ANY, { value: 'lt400', label: 'Under .400' }, { value: '400-499', label: '.400–.499' },
+  { value: '500', label: 'Exactly .500' }, { value: '501-599', label: '.501–.599' }, { value: '600plus', label: '.600+' }]
 const PREV_RESULT: Opt[] = [ANY, { value: 'blowout_win', label: 'Won by 17+' }, { value: 'win', label: 'Won by 1–16' },
   { value: 'loss', label: 'Lost by 1–16' }, { value: 'blowout_loss', label: 'Lost by 17+' }]
 const PREV_ATS: Opt[] = [ANY, { value: 'covered', label: 'Covered' }, { value: 'missed', label: 'Did not cover' }]

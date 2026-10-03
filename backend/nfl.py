@@ -40,7 +40,10 @@ def _spread_band(s: pd.Series) -> pd.Series:
 
 
 def _pct_band(p: pd.Series, games: pd.Series) -> pd.Series:
-    band = pd.Series(np.select([p < 0.4, p < 0.6], ["lt400", "400-599"], "600plus"), index=p.index)
+    eps = 1e-9
+    band = pd.Series(np.select(
+        [p < 0.4, p < 0.5 - eps, (p - 0.5).abs() <= eps, p < 0.6],
+        ["lt400", "400-499", "500", "501-599"], "600plus"), index=p.index)
     return band.where(games >= 3)  # bands only once a team has 3+ decided games
 
 
