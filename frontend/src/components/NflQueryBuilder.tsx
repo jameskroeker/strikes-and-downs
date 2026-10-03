@@ -37,7 +37,7 @@ const REST: Opt[] = [ANY, { value: 'off_bye', label: 'Off a bye' }, { value: 'sh
   { value: 'normal', label: 'Normal (7–9 days)' }, { value: 'extended', label: 'Extended, no bye (10+)' }, { value: 'opener', label: 'Season opener' }]
 const ROAD: Opt[] = [ANY, { value: 'home', label: 'At home' }, { value: 'road1', label: '1st road game' }, { value: 'road2plus', label: '2nd+ straight road game' }]
 const HOME_AFTER_ROAD: Opt[] = [ANY, { value: '0', label: 'No' }, { value: '1', label: 'After 1 road game' }, { value: '2plus', label: 'After 2+ road games' }]
-const EXACT_REC: Opt[] = [ANY, ...['0-0', '1-0', '0-1', '2-0', '1-1', '0-2'].map(r => ({ value: r, label: r }))]
+const WINS: Opt[] = [ANY, ...Array.from({ length: 18 }, (_, i) => ({ value: String(i), label: `${i} win${i === 1 ? '' : 's'}` }))]
 const PCT_BANDS: Opt[] = [ANY, { value: 'lt400', label: 'Under .400' }, { value: '400-599', label: '.400–.599' }, { value: '600plus', label: '.600+' }]
 const PREV_RESULT: Opt[] = [ANY, { value: 'blowout_win', label: 'Won by 17+' }, { value: 'win', label: 'Won by 1–16' },
   { value: 'loss', label: 'Lost by 1–16' }, { value: 'blowout_loss', label: 'Lost by 17+' }]
@@ -47,17 +47,17 @@ const PREV_UPSET: Opt[] = [ANY, { value: 'upset_win', label: 'Won as underdog' }
 const EMPTY = {
   seasons: 'hist', team: '', opponent: '', home_away: '', exclude_neutral: '', divisional: '', kickoff: '',
   phase: '', week: '', side: '', spread_band: '', total_band: '',
-  rest: '', road: '', home_after_road: '', rec: '', ats_rec: '', win_pct: '', ats_pct: '',
+  rest: '', road: '', home_after_road: '', wins: '', ats_wins: '', win_pct: '', ats_pct: '',
   prev_result: '', prev_ats: '', prev_upset: '', prev_ot: '',
-  opp_rest: '', opp_rec: '', opp_ats_rec: '', opp_win_pct: '', opp_ats_pct: '',
+  opp_rest: '', opp_wins: '', opp_ats_wins: '', opp_win_pct: '', opp_ats_pct: '',
   opp_prev_result: '', opp_prev_ats: '', opp_prev_upset: '',
 }
 type Filters = typeof EMPTY
 
 const SUGGESTED: { label: string; description: string; filters: Partial<Filters> }[] = [
   { label: 'Early-season favorites of 7–9.5', description: 'Moderate favorites in Weeks 1–6', filters: { phase: 'w1-6', spread_band: 'fav_7-9.5' } },
-  { label: 'Week 3: 2–0 ATS vs a 1–1 ATS opponent', description: 'Hot ATS starts in Week 3', filters: { week: '3', ats_rec: '2-0', opp_ats_rec: '1-1' } },
-  { label: 'Week 3: 0–2 ATS teams', description: 'Teams that failed to cover both opening games', filters: { week: '3', ats_rec: '0-2' } },
+  { label: 'Week 3: 2–0 ATS vs a 1–1 ATS opponent', description: 'Hot ATS starts in Week 3', filters: { week: '3', ats_wins: '2', opp_ats_wins: '1' } },
+  { label: 'Week 3: no ATS wins yet', description: 'Teams without a cover in their first two games', filters: { week: '3', ats_wins: '0' } },
   { label: 'Road favorites of 10+', description: 'Double-digit favorites away from home', filters: { home_away: 'away', spread_band: 'fav_10+' } },
   { label: 'Divisional road favorites of 0.5–2.5', description: 'Short road favorites in division games', filters: { divisional: 'true', home_away: 'away', spread_band: 'fav_0.5-2.5' } },
   { label: 'Off a blowout win, now favored', description: 'Teams that won by 17+ last week', filters: { prev_result: 'blowout_win', side: 'fav' } },
@@ -214,8 +214,8 @@ export function NflQueryBuilder() {
           <Select label="Rest" k="rest" opts={REST} f={filters} set={set} />
           <Select label="Road trip" k="road" opts={ROAD} f={filters} set={set} />
           <Select label="Home after road trip" k="home_after_road" opts={HOME_AFTER_ROAD} f={filters} set={set} />
-          <Select label="Record (Weeks 1–3)" k="rec" opts={EXACT_REC} f={filters} set={set} />
-          <Select label="ATS record (Weeks 1–3)" k="ats_rec" opts={EXACT_REC} f={filters} set={set} />
+          <Select label="Wins entering" k="wins" opts={WINS} f={filters} set={set} />
+          <Select label="ATS wins entering" k="ats_wins" opts={WINS} f={filters} set={set} />
           <Select label="Win % (3+ games)" k="win_pct" opts={PCT_BANDS} f={filters} set={set} />
           <Select label="ATS % (3+ games)" k="ats_pct" opts={PCT_BANDS} f={filters} set={set} />
           <Select label="Last game result" k="prev_result" opts={PREV_RESULT} f={filters} set={set} />
@@ -227,8 +227,8 @@ export function NflQueryBuilder() {
         <SectionLabel>Opponent situation (entering the game)</SectionLabel>
         <div className="qb-filters">
           <Select label="Opp rest" k="opp_rest" opts={REST} f={filters} set={set} />
-          <Select label="Opp record (Weeks 1–3)" k="opp_rec" opts={EXACT_REC} f={filters} set={set} />
-          <Select label="Opp ATS record (Weeks 1–3)" k="opp_ats_rec" opts={EXACT_REC} f={filters} set={set} />
+          <Select label="Opp wins entering" k="opp_wins" opts={WINS} f={filters} set={set} />
+          <Select label="Opp ATS wins entering" k="opp_ats_wins" opts={WINS} f={filters} set={set} />
           <Select label="Opp win % (3+ games)" k="opp_win_pct" opts={PCT_BANDS} f={filters} set={set} />
           <Select label="Opp ATS % (3+ games)" k="opp_ats_pct" opts={PCT_BANDS} f={filters} set={set} />
           <Select label="Opp last game result" k="opp_prev_result" opts={PREV_RESULT} f={filters} set={set} />
@@ -312,17 +312,23 @@ export function NflQueryBuilder() {
                       Matching games {result.games_truncated ? `(most recent ${result.games.length} of ${result.n})` : ''}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflowX: 'auto' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '84px 70px minmax(150px,1fr) 92px 56px 64px 44px 44px', gap: '8px', padding: '0 12px 0 15px', fontSize: '11px', color: '#475569', minWidth: '660px' }}>
+                        <span>Date</span><span>Week</span><span>Matchup</span>
+                        <span style={{ textAlign: 'right' }}>Entering (ATS)</span><span style={{ textAlign: 'right' }}>Spread</span>
+                        <span style={{ textAlign: 'right' }}>Score</span><span style={{ textAlign: 'right' }}>ATS</span><span style={{ textAlign: 'right' }}>O/U</span>
+                      </div>
                       {result.games.map((g: any, i: number) => {
                         const c = g.ats === 'cover' ? '#4caf50' : g.ats === 'miss' ? '#ef4444' : '#64748b'
                         return (
                           <div key={i} style={{
-                            display: 'grid', gridTemplateColumns: '84px 70px minmax(150px,1fr) 56px 64px 44px 44px', gap: '8px', alignItems: 'center',
+                            display: 'grid', gridTemplateColumns: '84px 70px minmax(150px,1fr) 92px 56px 64px 44px 44px', gap: '8px', alignItems: 'center',
                             background: '#1a1f2e', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', color: '#94a3b8',
-                            borderLeft: `3px solid ${c}`, minWidth: '560px',
+                            borderLeft: `3px solid ${c}`, minWidth: '660px',
                           }}>
                             <span style={{ color: '#64748b' }}>{g.game_date}</span>
                             <span style={{ color: '#64748b' }}>{g.season} {g.week}</span>
                             <span><b style={{ color: '#e2e8f0' }}>{g.team}</b> {g.home_away === 'Home' ? 'vs' : g.home_away === 'Neutral' ? 'n/' : '@'} {g.opponent}</span>
+                            <span style={{ textAlign: 'right', color: '#64748b' }} title="Record and ATS record entering the game">{g.entering_record} <span style={{ color: '#475569' }}>({g.entering_ats})</span></span>
                             <span style={{ textAlign: 'right' }}>{fmtSpread(g.spread)}</span>
                             <span style={{ textAlign: 'right', color: '#e2e8f0' }}>{g.team_score}-{g.opponent_score}</span>
                             <span style={{ textAlign: 'right', fontWeight: 700, color: c }}>{g.ats === 'cover' ? 'W' : g.ats === 'miss' ? 'L' : 'P'}</span>

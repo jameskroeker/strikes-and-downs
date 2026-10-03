@@ -44,11 +44,6 @@ def _pct_band(p: pd.Series, games: pd.Series) -> pd.Series:
     return band.where(games >= 3)  # bands only once a team has 3+ decided games
 
 
-def _exact_record(w: pd.Series, l: pd.Series, games: pd.Series) -> pd.Series:
-    rec = w.fillna(0).astype(int).astype(str) + "-" + l.fillna(0).astype(int).astype(str)
-    return rec.where(games <= 2)  # exact records only through week 3 (0-2 games played)
-
-
 def _tri(s: pd.Series, yes: str, no: str) -> pd.Series:
     """Map True/False/None object column to labels, keeping None as missing."""
     return s.map({True: yes, False: no})
@@ -85,8 +80,8 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
 
     su_games = df["entering_season_wins"] + df["entering_season_losses"] + df["entering_season_ties"]
     ats_games = df["entering_ats_wins"] + df["entering_ats_losses"]
-    df["_rec"] = _exact_record(df["entering_season_wins"], df["entering_season_losses"], su_games)
-    df["_ats_rec"] = _exact_record(df["entering_ats_wins"], df["entering_ats_losses"], su_games)
+    df["_wins"] = df["entering_season_wins"].astype(int)
+    df["_ats_wins"] = df["entering_ats_wins"].astype(int)
     df["_win_pct"] = _pct_band(df["entering_win_pct"], su_games)
     df["_ats_pct"] = _pct_band(df["entering_ats_win_pct"], ats_games)
 
@@ -96,7 +91,7 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     df["_prev_ot"] = _tri(df["prev_game_was_overtime"], "true", "false")
 
     # Opponent versions of the situational buckets
-    opp_cols = ["_rest", "_rec", "_ats_rec", "_win_pct", "_ats_pct", "_prev_result", "_prev_ats", "_prev_upset", "_road"]
+    opp_cols = ["_rest", "_wins", "_ats_wins", "_win_pct", "_ats_pct", "_prev_result", "_prev_ats", "_prev_upset", "_road"]
     opp = df[["game_id", "team"] + opp_cols].rename(columns={"team": "opponent", **{c: f"_opp{c}" for c in opp_cols}})
     df = df.merge(opp, on=["game_id", "opponent"], how="left")
     return df
@@ -120,9 +115,9 @@ async def fetch_nfl_df() -> pd.DataFrame:
 BUCKET_FILTERS = {
     "spread_band": "_spread_band", "total_band": "_total_band", "phase": "_phase",
     "rest": "_rest", "road": "_road", "home_after_road": "_home_after_road",
-    "rec": "_rec", "ats_rec": "_ats_rec", "win_pct": "_win_pct", "ats_pct": "_ats_pct",
+    "win_pct": "_win_pct", "ats_pct": "_ats_pct",
     "prev_result": "_prev_result", "prev_ats": "_prev_ats", "prev_upset": "_prev_upset", "prev_ot": "_prev_ot",
-    "opp_rest": "_opp_rest", "opp_road": "_opp_road", "opp_rec": "_opp_rec", "opp_ats_rec": "_opp_ats_rec",
+    "opp_rest": "_opp_rest", "opp_road": "_opp_road",
     "opp_win_pct": "_opp_win_pct", "opp_ats_pct": "_opp_ats_pct", "opp_prev_result": "_opp_prev_result",
     "opp_prev_ats": "_opp_prev_ats", "opp_prev_upset": "_opp_prev_upset",
 }
@@ -174,6 +169,11 @@ def _summarize(df: pd.DataFrame) -> dict:
     }
 
 
+def _rec_str(w, l, t) -> str:
+    base = f"{int(w)}-{int(l)}"
+    return f"{base}-{int(t)}" if t else base
+
+
 def _game_row(r: pd.Series) -> dict:
     ats = {True: "cover", False: "miss"}.get(r["spread_covered"], "push" if pd.notna(r["team_spread"]) else None)
     ou = {True: "over", False: "under"}.get(r["total_hit_over"], "push" if pd.notna(r["game_total"]) else None)
@@ -190,6 +190,8 @@ def _game_row(r: pd.Series) -> dict:
         "opponent_score": int(r["opponent_score"]),
         "ats": ats,
         "ou": ou,
+        "entering_record": _rec_str(r["entering_season_wins"], r["entering_season_losses"], r["entering_season_ties"]),
+        "entering_ats": _rec_str(r["entering_ats_wins"], r["entering_ats_losses"], r["entering_ats_pushes"]),
     }
 
 
@@ -206,11 +208,11 @@ async def nfl_query(
     side: Optional[str] = None,               # fav | dog (any spread size)
     spread_band: Optional[str] = None, total_band: Optional[str] = None, phase: Optional[str] = None,
     rest: Optional[str] = None, road: Optional[str] = None, home_after_road: Optional[str] = None,
-    rec: Optional[str] = None, ats_rec: Optional[str] = None, win_pct: Optional[str] = None, ats_pct: Optional[str] = None,
+    wins: Optional[int] = None, ats_wins: Optional[int] = None, win_pct: Optional[str] = None, ats_pct: Optional[str] = None,
     prev_result: Optional[str] = None, prev_ats: Optional[str] = None, prev_upset: Optional[str] = None,
     prev_ot: Optional[str] = None,
-    opp_rest: Optional[str] = None, opp_road: Optional[str] = None, opp_rec: Optional[str] = None,
-    opp_ats_rec: Optional[str] = None, opp_win_pct: Optional[str] = None, opp_ats_pct: Optional[str] = None,
+    opp_rest: Optional[str] = None, opp_road: Optional[str] = None,
+    opp_wins: Optional[int] = None, opp_ats_wins: Optional[int] = None, opp_win_pct: Optional[str] = None, opp_ats_pct: Optional[str] = None,
     opp_prev_result: Optional[str] = None, opp_prev_ats: Optional[str] = None, opp_prev_upset: Optional[str] = None,
 ):
     df = await fetch_nfl_df()
@@ -235,6 +237,12 @@ async def nfl_query(
         df = df[df["team_spread"] < 0]
     elif side == "dog":
         df = df[df["team_spread"] > 0]
+
+    for param, col in (("wins", "_wins"), ("ats_wins", "_ats_wins"),
+                       ("opp_wins", "_opp_wins"), ("opp_ats_wins", "_opp_ats_wins")):
+        val = locals()[param]
+        if val is not None:
+            df = df[df[col] == val]
 
     params = locals()
     for param, col in BUCKET_FILTERS.items():
