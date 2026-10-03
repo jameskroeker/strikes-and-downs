@@ -311,7 +311,7 @@ export function QueryBuilder() {
         <a href="/"><img src="/logo.png" alt="Strikes + Downs" style={{ width: '67%', maxWidth: '300px', display: 'block', margin: '0 auto' }} /></a>
       </header>
       <div className="qb-nav">
-        <button className="qb-nav-btn" onClick={() => navigate('/')}>← Back to Games</button>
+        <button className="qb-nav-btn" onClick={() => navigate('/mlb')}>← Back to MLB Games</button>
       </div>
       {games.length > 0 && (
         <div style={{ padding: '0 16px', marginBottom: '8px' }}>

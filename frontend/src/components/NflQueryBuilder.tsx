@@ -168,7 +168,7 @@ export function NflQueryBuilder() {
         <a href="/"><img src="/logo.png" alt="Strikes + Downs" style={{ width: '67%', maxWidth: '300px', display: 'block', margin: '0 auto' }} /></a>
       </header>
       <div className="qb-nav">
-        <button className="qb-nav-btn" onClick={() => navigate('/')}>← Back to MLB</button>
+        <button className="qb-nav-btn" onClick={() => navigate('/')}>← Home</button>
       </div>
 
       <div className="qb-container">
