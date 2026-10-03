@@ -31,10 +31,12 @@ const PHASES: Opt[] = [ANY, { value: 'w1-6', label: 'Weeks 1–6' }, { value: 'w
 const WEEKS: Opt[] = [ANY, ...Array.from({ length: 18 }, (_, i) => ({ value: String(i + 1), label: `Week ${i + 1}` }))]
 const HOME_AWAY: Opt[] = [ANY, { value: 'home', label: 'Home' }, { value: 'away', label: 'Away' }]
 const YES_NO: Opt[] = [ANY, { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]
-const KICKOFF: Opt[] = [ANY, { value: 'primetime', label: 'Any primetime (night)' }, { value: 'TNF', label: 'Thursday night' },
-  { value: 'SNF', label: 'Sunday night' }, { value: 'MNF', label: 'Monday night' }, { value: 'day', label: 'Day game' }]
-const REST: Opt[] = [ANY, { value: 'off_bye', label: 'Off a bye' }, { value: 'short', label: 'Short rest (<7 days)' },
-  { value: 'normal', label: 'Normal (7–9 days)' }, { value: 'extended', label: 'Extended, no bye (10+)' }, { value: 'opener', label: 'Season opener' }]
+const KICKOFF: Opt[] = [ANY, { value: 'thu', label: 'Thursday' }, { value: 'fri', label: 'Friday' }, { value: 'sat', label: 'Saturday' },
+  { value: 'sun', label: 'Sunday (day)' }, { value: 'snf', label: 'Sunday night' }, { value: 'mnf', label: 'Monday night' },
+  { value: 'primetime', label: 'Any primetime (night)' }, { value: 'other', label: 'Other (Wednesday)' }]
+const REST: Opt[] = [ANY, { value: 'off_bye', label: 'Off a bye week' }, { value: 'off_thu', label: 'Off a Thursday game' },
+  { value: 'off_fri_sat', label: 'Off a Friday/Saturday game' }, { value: 'off_sun', label: 'Off a Sunday game (normal)' },
+  { value: 'off_mnf', label: 'Off a Monday night game' }, { value: 'opener', label: 'Season opener' }]
 const ROAD: Opt[] = [ANY, { value: 'home', label: 'At home' }, { value: 'road1', label: '1st road game' }, { value: 'road2plus', label: '2nd+ straight road game' }]
 const HOME_AFTER_ROAD: Opt[] = [ANY, { value: '0', label: 'No' }, { value: '1', label: 'After 1 road game' }, { value: '2plus', label: 'After 2+ road games' }]
 const WINS: Opt[] = [ANY, ...Array.from({ length: 18 }, (_, i) => ({ value: String(i), label: `${i} win${i === 1 ? '' : 's'}` }))]
@@ -197,7 +199,7 @@ export function NflQueryBuilder() {
           <Select label="Home / Away" k="home_away" opts={HOME_AWAY} f={filters} set={set} />
           <Select label="Exclude neutral-site games" k="exclude_neutral" opts={[ANY, { value: 'true', label: 'Yes' }]} f={filters} set={set} />
           <Select label="Divisional" k="divisional" opts={YES_NO} f={filters} set={set} />
-          <Select label="Kickoff" k="kickoff" opts={KICKOFF} f={filters} set={set} />
+          <Select label="Game day" k="kickoff" opts={KICKOFF} f={filters} set={set} />
           <Select label="Season phase" k="phase" opts={PHASES} f={filters} set={set} />
           <Select label="Week" k="week" opts={WEEKS} f={filters} set={set} />
         </div>
@@ -211,7 +213,7 @@ export function NflQueryBuilder() {
 
         <SectionLabel>Team situation (entering the game)</SectionLabel>
         <div className="qb-filters">
-          <Select label="Rest" k="rest" opts={REST} f={filters} set={set} />
+          <Select label="Last game played" k="rest" opts={REST} f={filters} set={set} />
           <Select label="Road trip" k="road" opts={ROAD} f={filters} set={set} />
           <Select label="Home after road trip" k="home_after_road" opts={HOME_AFTER_ROAD} f={filters} set={set} />
           <Select label="Wins entering" k="wins" opts={WINS} f={filters} set={set} />
@@ -226,7 +228,7 @@ export function NflQueryBuilder() {
 
         <SectionLabel>Opponent situation (entering the game)</SectionLabel>
         <div className="qb-filters">
-          <Select label="Opp rest" k="opp_rest" opts={REST} f={filters} set={set} />
+          <Select label="Opp last game played" k="opp_rest" opts={REST} f={filters} set={set} />
           <Select label="Opp wins entering" k="opp_wins" opts={WINS} f={filters} set={set} />
           <Select label="Opp ATS wins entering" k="opp_ats_wins" opts={WINS} f={filters} set={set} />
           <Select label="Opp win % (3+ games)" k="opp_win_pct" opts={PCT_BANDS} f={filters} set={set} />

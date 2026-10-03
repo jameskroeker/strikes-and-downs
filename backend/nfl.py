@@ -63,15 +63,21 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
         df["game_total"], [0, 39.9, 44.9, 49.9, 99], labels=["lt40", "40-44.5", "45-49.5", "50plus"]
     ).astype(object)
 
-    df["_kickoff"] = np.where(
-        df["kickoff_slot"].isin(["TNF", "SNF", "MNF"]),
-        df["kickoff_slot"],
-        np.where(df["is_primetime"] == True, "other_night", "day"),
+    # This game: day + slot
+    dow = df["day_of_week"]
+    night = df["is_primetime"] == True
+    df["_kickoff"] = np.select(
+        [dow == "Thursday", dow == "Friday", dow == "Saturday", (dow == "Sunday") & night, dow == "Sunday",
+         dow == "Monday"],
+        ["thu", "fri", "sat", "snf", "sun", "mnf"], "other",
     )
+    # Rest: what the team played last (bye takes precedence)
+    srt = df.sort_values(["season", "team", "game_date"])
+    prev_dow = srt.groupby(["season", "team"])["day_of_week"].shift(1).reindex(df.index)
     df["_rest"] = np.select(
-        [df["is_off_bye"] == True, df["rest_status"] == "short_rest", df["rest_status"] == "extended_rest",
-         df["rest_status"] == "normal_rest"],
-        ["off_bye", "short", "extended", "normal"], "opener",
+        [prev_dow.isna(), df["is_off_bye"] == True, prev_dow.isin(["Wednesday", "Thursday"]),
+         prev_dow.isin(["Friday", "Saturday"]), prev_dow == "Monday"],
+        ["opener", "off_bye", "off_thu", "off_fri_sat", "off_mnf"], "off_sun",
     )
     df["_road"] = np.select([df["road_trip_game"] == 0, df["road_trip_game"] == 1], ["home", "road1"], "road2plus")
     df["_home_after_road"] = np.select(
@@ -203,7 +209,7 @@ async def nfl_query(
     home_away: Optional[str] = None,          # home | away
     exclude_neutral: Optional[str] = None,    # true
     divisional: Optional[str] = None,         # true | false
-    kickoff: Optional[str] = None,            # primetime | TNF | SNF | MNF | day
+    kickoff: Optional[str] = None,            # primetime | thu | fri | sat | sun | snf | mnf | other
     week: Optional[int] = None,
     side: Optional[str] = None,               # fav | dog (any spread size)
     spread_band: Optional[str] = None, total_band: Optional[str] = None, phase: Optional[str] = None,
