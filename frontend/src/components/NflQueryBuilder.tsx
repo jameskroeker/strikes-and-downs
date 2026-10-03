@@ -48,10 +48,10 @@ const PREV_ATS: Opt[] = [ANY, { value: 'covered', label: 'Covered' }, { value: '
 const PREV_UPSET: Opt[] = [ANY, { value: 'upset_win', label: 'Won as underdog' }, { value: 'upset_loss', label: 'Lost as favorite' }, { value: 'none', label: 'No upset' }]
 
 const EMPTY = {
-  seasons: 'hist', team: '', opponent: '', home_away: '', exclude_neutral: '', divisional: '', kickoff: '',
+  seasons: 'hist', team: '', opponent: '', home_away: '', exclude_neutral: '', international: '', divisional: '', kickoff: '',
   phase: '', week: '', side: '', spread_band: '', total_band: '',
   rest: '', road: '', home_after_road: '', wins: '', ats_wins: '', win_pct: '', ats_pct: '',
-  prev_result: '', prev_ats: '', prev_upset: '', prev_ot: '',
+  prev_result: '', prev_ats: '', prev_upset: '', prev_ot: '', prev_intl: '',
   opp_rest: '', opp_wins: '', opp_ats_wins: '', opp_win_pct: '', opp_ats_pct: '',
   opp_prev_result: '', opp_prev_ats: '', opp_prev_upset: '',
 }
@@ -199,6 +199,7 @@ export function NflQueryBuilder() {
           <Select label="Opponent" k="opponent" opts={teamOpts} f={filters} set={set} />
           <Select label="Home / Away" k="home_away" opts={HOME_AWAY} f={filters} set={set} />
           <Select label="Exclude neutral-site games" k="exclude_neutral" opts={[ANY, { value: 'true', label: 'Yes' }]} f={filters} set={set} />
+          <Select label="International game" k="international" opts={[ANY, { value: 'only', label: 'International only' }, { value: 'exclude', label: 'Exclude international' }]} f={filters} set={set} />
           <Select label="Divisional" k="divisional" opts={YES_NO} f={filters} set={set} />
           <Select label="Game day" k="kickoff" opts={KICKOFF} f={filters} set={set} />
           <Select label="Season phase" k="phase" opts={PHASES} f={filters} set={set} />
@@ -225,6 +226,7 @@ export function NflQueryBuilder() {
           <Select label="Last game ATS" k="prev_ats" opts={PREV_ATS} f={filters} set={set} />
           <Select label="Last game upset" k="prev_upset" opts={PREV_UPSET} f={filters} set={set} />
           <Select label="Last game went to OT" k="prev_ot" opts={YES_NO} f={filters} set={set} />
+          <Select label="Last game was international" k="prev_intl" opts={YES_NO} f={filters} set={set} />
         </div>
 
         <SectionLabel>Opponent situation (entering the game)</SectionLabel>

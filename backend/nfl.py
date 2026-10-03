@@ -22,6 +22,11 @@ NFL_PARQUET_URL = (
 )
 NFL_CACHE_TTL = 30 * 60  # 30 minutes
 HIST_SEASONS = [2022, 2023, 2024, 2025]
+# International venues (add new host cities here as the NFL expands its schedule)
+INTERNATIONAL_CITIES = {
+    "London", "Munich", "Frankfurt", "Berlin", "Madrid", "Dublin", "Mexico City", "Sao Paulo",
+    "Melbourne", "Toronto", "Paris", "Barcelona", "Rio de Janeiro", "Tokyo",
+}
 SAMPLE_WARNING_N = 15
 MAX_GAMES_RETURNED = 50
 
@@ -81,6 +86,11 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
         [prev_dow.isna(), df["is_off_bye"] == True, prev_dow.isin(["Wednesday", "Thursday"]),
          prev_dow.isin(["Friday", "Saturday"]), prev_dow == "Monday"],
         ["opener", "off_bye", "off_thu", "off_fri_sat", "off_mnf"], "off_sun",
+    )
+    df["_intl"] = df["venue_city"].isin(INTERNATIONAL_CITIES)
+    df["_prev_intl"] = (
+        srt.assign(_i=srt["venue_city"].isin(INTERNATIONAL_CITIES))
+        .groupby(["season", "team"])["_i"].shift(1).reindex(df.index)
     )
     df["_road"] = np.select([df["road_trip_game"] == 0, df["road_trip_game"] == 1], ["home", "road1"], "road2plus")
     df["_home_after_road"] = np.select(
@@ -211,6 +221,8 @@ async def nfl_query(
     opponent: Optional[str] = None,
     home_away: Optional[str] = None,          # home | away
     exclude_neutral: Optional[str] = None,    # true
+    international: Optional[str] = None,      # only | exclude
+    prev_intl: Optional[str] = None,          # true | false
     divisional: Optional[str] = None,         # true | false
     kickoff: Optional[str] = None,            # primetime | thu | fri | sat | sun | snf | mnf | other
     week: Optional[int] = None,
@@ -236,6 +248,12 @@ async def nfl_query(
         df = df[df["home_away"].str.lower() == home_away]
     if exclude_neutral == "true":
         df = df[df["is_neutral_site"] == False]
+    if international == "only":
+        df = df[df["_intl"]]
+    elif international == "exclude":
+        df = df[~df["_intl"]]
+    if prev_intl in ("true", "false"):
+        df = df[df["_prev_intl"] == (prev_intl == "true")]
     if divisional in ("true", "false"):
         df = df[df["is_divisional_game"] == (divisional == "true")]
     if kickoff:
