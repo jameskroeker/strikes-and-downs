@@ -87,9 +87,10 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
          prev_dow.isin(["Friday", "Saturday"]), prev_dow == "Monday"],
         ["opener", "off_bye", "off_thu", "off_fri_sat", "off_mnf"], "off_sun",
     )
-    df["_intl"] = df["venue_city"].isin(INTERNATIONAL_CITIES)
+    intl_lower = {c.lower() for c in INTERNATIONAL_CITIES}
+    df["_intl"] = df["venue_city"].astype(str).str.lower().isin(intl_lower)
     df["_prev_intl"] = (
-        srt.assign(_i=srt["venue_city"].isin(INTERNATIONAL_CITIES))
+        srt.assign(_i=srt["venue_city"].astype(str).str.lower().isin(intl_lower))
         .groupby(["season", "team"])["_i"].shift(1).reindex(df.index)
     )
     df["_road"] = np.select([df["road_trip_game"] == 0, df["road_trip_game"] == 1], ["home", "road1"], "road2plus")
