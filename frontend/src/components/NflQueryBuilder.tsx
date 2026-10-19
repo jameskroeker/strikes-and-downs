@@ -8,8 +8,8 @@ type Opt = { value: string; label: string }
 const ANY: Opt = { value: '', label: 'Any' }
 
 const SEASONS: Opt[] = [
-  { value: 'hist', label: '2022–2025 (completed seasons)' },
-  { value: 'all', label: 'All, including 2026' },
+  { value: 'all', label: 'All seasons (2022–2026)' },
+  { value: 'hist', label: '2022–2025 (completed seasons only)' },
   { value: '2026', label: '2026 only' },
   { value: '2025', label: '2025' },
   { value: '2024', label: '2024' },
@@ -53,7 +53,7 @@ const PREV_ATS: Opt[] = [ANY, { value: 'covered', label: 'Covered' }, { value: '
 const PREV_UPSET: Opt[] = [ANY, { value: 'upset_win', label: 'Won as underdog' }, { value: 'upset_loss', label: 'Lost as favorite' }, { value: 'none', label: 'No upset' }]
 
 const EMPTY = {
-  seasons: 'hist', team: '', opponent: '', home_away: '', exclude_neutral: '', international: '', divisional: '', kickoff: '',
+  seasons: 'all', team: '', opponent: '', home_away: '', exclude_neutral: '', international: '', divisional: '', kickoff: '',
   phase: '', week: '', side: '', spread_band: '', total_band: '',
   rest: '', road: '', home_after_road: '', wins: '', ats_wins: '', win_pct: '', ats_pct: '',
   prev_result: '', prev_ats: '', prev_upset: '', prev_ot: '', prev_intl: '',

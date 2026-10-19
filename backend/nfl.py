@@ -221,7 +221,7 @@ def _game_row(r: pd.Series) -> dict:
 
 @router.get("/query")
 async def nfl_query(
-    seasons: str = "hist",
+    seasons: str = "all",
     team: Optional[str] = None,
     opponent: Optional[str] = None,
     home_away: Optional[str] = None,          # home | away
