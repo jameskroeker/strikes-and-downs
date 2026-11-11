@@ -56,7 +56,7 @@ const EMPTY = {
   seasons: 'all', team: '', opponent: '', home_away: '', exclude_neutral: '', international: '', divisional: '', kickoff: '',
   phase: '', week: '', side: '', spread_band: '', total_band: '',
   rest: '', road: '', home_after_road: '', wins: '', ats_wins: '', win_pct: '', ats_pct: '',
-  prev_result: '', prev_ats: '', prev_upset: '', prev_ot: '', prev_intl: '',
+  prev_result: '', prev_ats: '', prev_upset: '', prev_ot: '', prev_intl: '', rematch: '',
   opp_rest: '', opp_wins: '', opp_ats_wins: '', opp_win_pct: '', opp_ats_pct: '',
   opp_prev_result: '', opp_prev_ats: '', opp_prev_upset: '',
 }
@@ -206,6 +206,9 @@ export function NflQueryBuilder() {
           <Select label="Exclude neutral-site games" k="exclude_neutral" opts={[ANY, { value: 'true', label: 'Yes' }]} f={filters} set={set} />
           <Select label="International game" k="international" opts={[ANY, { value: 'only', label: 'International only' }, { value: 'exclude', label: 'Exclude international' }]} f={filters} set={set} />
           <Select label="Divisional" k="divisional" opts={YES_NO} f={filters} set={set} />
+          <Select label="Second matchup this season" k="rematch" opts={[ANY, { value: 'no', label: 'No (first meeting)' },
+            { value: 'yes', label: 'Yes (any result)' }, { value: 'won_first', label: 'Yes, won first meeting' },
+            { value: 'lost_first', label: 'Yes, lost first meeting' }]} f={filters} set={set} />
           <Select label="Game day" k="kickoff" opts={KICKOFF} f={filters} set={set} />
           <Select label="Season phase" k="phase" opts={PHASES} f={filters} set={set} />
           <Select label="Week" k="week" opts={WEEKS} f={filters} set={set} />

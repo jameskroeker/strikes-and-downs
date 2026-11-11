@@ -113,6 +113,13 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     df["_prev_ats"] = _tri(df["prev_spread_covered"], "covered", "missed")
     df["_prev_upset"] = df["prev_upset"]
     df["_prev_ot"] = _tri(df["prev_game_was_overtime"], "true", "false")
+    # Rematch within the same season: result of the most recent earlier meeting with this opponent
+    srt2 = df.sort_values(["season", "team", "opponent", "game_date"])
+    last_won = srt2.groupby(["season", "team", "opponent"])["team_won"].shift(1)
+    met = srt2.groupby(["season", "team", "opponent"]).cumcount() > 0
+    rm = pd.Series(np.select([~met, last_won == True, last_won == False], ["no", "won_first", "lost_first"], "tied_first"),
+                   index=srt2.index)
+    df["_rematch"] = rm.reindex(df.index)
 
     # Opponent versions of the situational buckets
     opp_cols = ["_rest", "_wins", "_ats_wins", "_win_pct", "_ats_pct", "_prev_result", "_prev_ats", "_prev_upset", "_road"]
@@ -237,6 +244,7 @@ async def nfl_query(
     wins: Optional[int] = None, ats_wins: Optional[int] = None, win_pct: Optional[str] = None, ats_pct: Optional[str] = None,
     prev_result: Optional[str] = None, prev_ats: Optional[str] = None, prev_upset: Optional[str] = None,
     prev_ot: Optional[str] = None,
+    rematch: Optional[str] = None,            # no | yes | won_first | lost_first
     opp_rest: Optional[str] = None, opp_road: Optional[str] = None,
     opp_wins: Optional[int] = None, opp_ats_wins: Optional[int] = None, opp_win_pct: Optional[str] = None, opp_ats_pct: Optional[str] = None,
     opp_prev_result: Optional[str] = None, opp_prev_ats: Optional[str] = None, opp_prev_upset: Optional[str] = None,
@@ -257,6 +265,10 @@ async def nfl_query(
         df = df[df["_intl"]]
     elif international == "exclude":
         df = df[~df["_intl"]]
+    if rematch == "yes":
+        df = df[df["_rematch"] != "no"]
+    elif rematch in ("no", "won_first", "lost_first"):
+        df = df[df["_rematch"] == rematch]
     if prev_intl in ("true", "false"):
         df = df[df["_prev_intl"] == (prev_intl == "true")]
     if divisional in ("true", "false"):
