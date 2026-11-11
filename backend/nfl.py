@@ -113,6 +113,24 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     df["_prev_ats"] = _tri(df["prev_spread_covered"], "covered", "missed")
     df["_prev_upset"] = df["prev_upset"]
     df["_prev_ot"] = _tri(df["prev_game_was_overtime"], "true", "false")
+    # Streaks entering the game (within season): W3+/W2/W1/L1/L2/L3+, reset by a tie (or ATS push)
+    def _streak(flag_col):
+        srt3 = df.sort_values(["season", "team", "game_date"])
+        out = pd.Series(index=srt3.index, dtype=object)
+        for _, g in srt3.groupby(["season", "team"]):
+            run = 0
+            for i, v in zip(g.index, g[flag_col]):
+                out[i] = None if run == 0 else (f"w{min(run, 3)}" if run > 0 else f"l{min(-run, 3)}")
+                if v is True or v == True:
+                    run = run + 1 if run > 0 else 1
+                elif v is False or (v == False and v is not None and not pd.isna(v)):
+                    run = run - 1 if run < 0 else -1
+                else:
+                    run = 0
+        return out.reindex(df.index)
+    df["_streak"] = _streak("team_won")
+    df["_ats_streak"] = _streak("spread_covered")
+
     # Rematch within the same season: result of the most recent earlier meeting with this opponent
     srt2 = df.sort_values(["season", "team", "opponent", "game_date"])
     last_won = srt2.groupby(["season", "team", "opponent"])["team_won"].shift(1)
@@ -122,7 +140,7 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     df["_rematch"] = rm.reindex(df.index)
 
     # Opponent versions of the situational buckets
-    opp_cols = ["_rest", "_wins", "_ats_wins", "_win_pct", "_ats_pct", "_prev_result", "_prev_ats", "_prev_upset", "_road"]
+    opp_cols = ["_streak", "_ats_streak", "_rest", "_wins", "_ats_wins", "_win_pct", "_ats_pct", "_prev_result", "_prev_ats", "_prev_upset", "_road"]
     opp = df[["game_id", "team"] + opp_cols].rename(columns={"team": "opponent", **{c: f"_opp{c}" for c in opp_cols}})
     df = df.merge(opp, on=["game_id", "opponent"], how="left")
     return df
@@ -146,6 +164,7 @@ async def fetch_nfl_df() -> pd.DataFrame:
 BUCKET_FILTERS = {
     "spread_band": "_spread_band", "total_band": "_total_band", "phase": "_phase",
     "rest": "_rest", "road": "_road", "home_after_road": "_home_after_road",
+    "streak": "_streak", "ats_streak": "_ats_streak", "opp_streak": "_opp_streak", "opp_ats_streak": "_opp_ats_streak",
     "win_pct": "_win_pct", "ats_pct": "_ats_pct",
     "prev_result": "_prev_result", "prev_ats": "_prev_ats", "prev_upset": "_prev_upset", "prev_ot": "_prev_ot",
     "opp_rest": "_opp_rest", "opp_road": "_opp_road",
@@ -244,6 +263,8 @@ async def nfl_query(
     wins: Optional[int] = None, ats_wins: Optional[int] = None, win_pct: Optional[str] = None, ats_pct: Optional[str] = None,
     prev_result: Optional[str] = None, prev_ats: Optional[str] = None, prev_upset: Optional[str] = None,
     prev_ot: Optional[str] = None,
+    streak: Optional[str] = None, ats_streak: Optional[str] = None,
+    opp_streak: Optional[str] = None, opp_ats_streak: Optional[str] = None,
     rematch: Optional[str] = None,            # no | yes | won_first | lost_first
     opp_rest: Optional[str] = None, opp_road: Optional[str] = None,
     opp_wins: Optional[int] = None, opp_ats_wins: Optional[int] = None, opp_win_pct: Optional[str] = None, opp_ats_pct: Optional[str] = None,
@@ -293,7 +314,10 @@ async def nfl_query(
         val = params.get(param)
         if not val:
             continue
-        if col in ("_prev_result", "_opp_prev_result") and val in ("any_win", "any_loss"):
+        if col.endswith("streak") and val.endswith("plus"):   # e.g. w2plus -> w2 or w3
+            side, n = val[0], int(val[1])
+            df = df[df[col].isin([f"{side}{k}" for k in range(n, 4)])]
+        elif col in ("_prev_result", "_opp_prev_result") and val in ("any_win", "any_loss"):
             df = df[df[col].astype(str).str.startswith("w" if val == "any_win" else "l")]
         else:
             df = df[df[col] == val]

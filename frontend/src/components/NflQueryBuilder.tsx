@@ -49,6 +49,12 @@ const PREV_RESULT: Opt[] = [ANY,
   { value: 'any_loss', label: 'Lost (any margin)' },
   { value: 'l1-3', label: 'Lost by 1–3 (field goal)' }, { value: 'l4-8', label: 'Lost by 4–8 (one score)' },
   { value: 'l9-16', label: 'Lost by 9–16 (two scores)' }, { value: 'l17', label: 'Lost by 17+ (blowout)' }]
+const STREAK: Opt[] = [ANY,
+  { value: 'w1plus', label: 'Won last game (1+)' }, { value: 'w2plus', label: 'Won 2+ straight' }, { value: 'w3', label: 'Won 3+ straight' },
+  { value: 'l1plus', label: 'Lost last game (1+)' }, { value: 'l2plus', label: 'Lost 2+ straight' }, { value: 'l3', label: 'Lost 3+ straight' }]
+const ATS_STREAK: Opt[] = [ANY,
+  { value: 'w1plus', label: 'Covered last game (1+)' }, { value: 'w2plus', label: 'Covered 2+ straight' }, { value: 'w3', label: 'Covered 3+ straight' },
+  { value: 'l1plus', label: 'Missed last game (1+)' }, { value: 'l2plus', label: 'Missed 2+ straight' }, { value: 'l3', label: 'Missed 3+ straight' }]
 const PREV_ATS: Opt[] = [ANY, { value: 'covered', label: 'Covered' }, { value: 'missed', label: 'Did not cover' }]
 const PREV_UPSET: Opt[] = [ANY, { value: 'upset_win', label: 'Won as underdog' }, { value: 'upset_loss', label: 'Lost as favorite' }, { value: 'none', label: 'No upset' }]
 
@@ -56,7 +62,7 @@ const EMPTY = {
   seasons: 'all', team: '', opponent: '', home_away: '', exclude_neutral: '', international: '', divisional: '', kickoff: '',
   phase: '', week: '', side: '', spread_band: '', total_band: '',
   rest: '', road: '', home_after_road: '', wins: '', ats_wins: '', win_pct: '', ats_pct: '',
-  prev_result: '', prev_ats: '', prev_upset: '', prev_ot: '', prev_intl: '', rematch: '',
+  prev_result: '', prev_ats: '', prev_upset: '', prev_ot: '', prev_intl: '', rematch: '', streak: '', ats_streak: '', opp_streak: '', opp_ats_streak: '',
   opp_rest: '', opp_wins: '', opp_ats_wins: '', opp_win_pct: '', opp_ats_pct: '',
   opp_prev_result: '', opp_prev_ats: '', opp_prev_upset: '',
 }
@@ -230,6 +236,8 @@ export function NflQueryBuilder() {
           <Select label="ATS wins entering" k="ats_wins" opts={WINS} f={filters} set={set} />
           <Select label="Win % (3+ games)" k="win_pct" opts={PCT_BANDS} f={filters} set={set} />
           <Select label="ATS % (3+ games)" k="ats_pct" opts={PCT_BANDS} f={filters} set={set} />
+          <Select label="Win/loss streak" k="streak" opts={STREAK} f={filters} set={set} />
+          <Select label="ATS streak" k="ats_streak" opts={ATS_STREAK} f={filters} set={set} />
           <Select label="Last game result" k="prev_result" opts={PREV_RESULT} f={filters} set={set} />
           <Select label="Last game ATS" k="prev_ats" opts={PREV_ATS} f={filters} set={set} />
           <Select label="Last game upset" k="prev_upset" opts={PREV_UPSET} f={filters} set={set} />
@@ -244,6 +252,8 @@ export function NflQueryBuilder() {
           <Select label="Opp ATS wins entering" k="opp_ats_wins" opts={WINS} f={filters} set={set} />
           <Select label="Opp win % (3+ games)" k="opp_win_pct" opts={PCT_BANDS} f={filters} set={set} />
           <Select label="Opp ATS % (3+ games)" k="opp_ats_pct" opts={PCT_BANDS} f={filters} set={set} />
+          <Select label="Opp win/loss streak" k="opp_streak" opts={STREAK} f={filters} set={set} />
+          <Select label="Opp ATS streak" k="opp_ats_streak" opts={ATS_STREAK} f={filters} set={set} />
           <Select label="Opp last game result" k="opp_prev_result" opts={PREV_RESULT} f={filters} set={set} />
           <Select label="Opp last game ATS" k="opp_prev_ats" opts={PREV_ATS} f={filters} set={set} />
           <Select label="Opp last game upset" k="opp_prev_upset" opts={PREV_UPSET} f={filters} set={set} />
